@@ -82,11 +82,12 @@ export function desgastes(state: AppState): Desgaste[] {
 /** Salud del vehículo: promedio ponderado de vida útil restante + castigo por vencimientos legales. */
 export function saludVehiculo(state: AppState): number {
   const ds = desgastes(state);
-  if (ds.length === 0) return 100;
-  const promedio = (ds.reduce((acc, d) => acc + d.restantePct, 0) / ds.length) * 100;
   // Lo legal pesa: es lo que te puede dejar en patios.
   const docs = documentosConVencimiento(state);
   const legales = docs.length === 0 ? 100 : (docs.filter((d) => d.diasRestantes >= 0).length / docs.length) * 100;
+  // Sin nada que evaluar, no castigar.
+  if (ds.length === 0 && docs.length === 0) return 100;
+  const promedio = ds.length === 0 ? 100 : (ds.reduce((acc, d) => acc + d.restantePct, 0) / ds.length) * 100;
   return Math.round(clamp(promedio * 0.55 + legales * 0.45, 0, 100));
 }
 
