@@ -180,6 +180,91 @@ test("Pico y placa: exporta funciones usables", () => {
   assert.ok(fns.length >= 1, "picoPlaca no exporta funciones");
 });
 
+/* ------------------------------- auditoría ------------------------------- */
+let auditoria = null;
+try {
+  auditoria = await load("auditoria");
+} catch {
+  /* el módulo todavía no existe: los chequeos de abajo fallan a propósito */
+}
+
+function estadoBase(extra = {}) {
+  return {
+    version: 1,
+    vehiculo: { id: "v1", placa: "ABC12D", apodo: "XTZ", marca: "Yamaha", linea: "XTZ 250",
+      modelo: 2021, color: "azul", cilindraje: 249, kmActual: 10000, fechaMatricula: "2024-03-15",
+      ciudad: "bogota", archivado: false, creado: "2026-01-01" },
+    documentos: [], componentes: [], mantenimientos: [], alertas: [],
+    talleres: [], ordenes: [], puntos: [], tareas: [],
+    ajustes: { nombre: "", tema: "auto", ciudad: "bogota", tipoVehiculo: "moto", moneda: "COP",
+      mostrarPuntos: true, picoPlacaDigitos: {}, picoPlacaActivo: true },
+    onboardingCompleto: true,
+    ...extra,
+  };
+}
+
+test("Auditoría: estado limpio no inventa hallazgos", () => {
+  assert.ok(auditoria?.auditoria, "falta exportar auditoria() en src/lib/auditoria.ts");
+  assert.deepEqual(auditoria.auditoria(estadoBase(), HOY), []);
+});
+
+test("Auditoría: detecta mantenimiento con km por encima del odómetro", () => {
+  const st = estadoBase({
+    mantenimientos: [{ id: "m1", vehiculoId: "v1", fecha: "2026-10-01", km: 12000,
+      categoria: "aceite", titulo: "Cambio de aceite", tipo: "preventivo", costo: 80000 }],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "km-retroceso" && x.severidad === "alta"), JSON.stringify(h));
+});
+
+test("Auditoría: detecta fechas futuras", () => {
+  const st = estadoBase({
+    mantenimientos: [{ id: "m1", vehiculoId: "v1", fecha: "2027-01-15", km: 9000,
+      categoria: "aceite", titulo: "Cambio de aceite", tipo: "preventivo", costo: 80000 }],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "fecha-futura"), JSON.stringify(h));
+});
+
+test("Auditoría: documento sin fecha de vencimiento", () => {
+  const st = estadoBase({ documentos: [{ id: "d1", vehiculoId: "v1", tipo: "soat", nombre: "SOAT" }] });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "doc-sin-fecha"), JSON.stringify(h));
+});
+
+test("Auditoría: componente sin intervalo no puede calcular desgaste", () => {
+  const st = estadoBase({
+    componentes: [{ id: "c1", vehiculoId: "v1", nombre: "Bujía", categoria: "bujia",
+      intervaloKm: 0, intervaloMeses: 0, vidaUtilKm: 0, costoEstimado: 0, ultimoKm: 0,
+      ultimaFecha: HOY, activo: true }],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "componente-sin-intervalo" && x.severidad === "alta"), JSON.stringify(h));
+});
+
+test("Auditoría: tanqueo sin galones", () => {
+  const st = estadoBase({
+    mantenimientos: [{ id: "m1", vehiculoId: "v1", fecha: "2026-10-01", km: 9500,
+      categoria: "combustible", titulo: "Tanqueo", tipo: "preventivo", costo: 50000,
+      tanqueo: { galones: 0, precioGalon: 16000, odometro: 9500, tanqueLleno: true } }],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "tanqueo-incompleto"), JSON.stringify(h));
+});
+
+test("Auditoría: odómetro no monotónico entre mantenimientos", () => {
+  const st = estadoBase({
+    mantenimientos: [
+      { id: "m1", vehiculoId: "v1", fecha: "2026-09-01", km: 9000, categoria: "aceite",
+        titulo: "Aceite", tipo: "preventivo", costo: 80000 },
+      { id: "m2", vehiculoId: "v1", fecha: "2026-10-01", km: 8500, categoria: "frenos",
+        titulo: "Pastillas", tipo: "correctivo", costo: 40000 },
+    ],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  assert.ok(h.some((x) => x.codigo === "odo-no-monotonico"), JSON.stringify(h));
+});
+
 /* ------------------------------- runner --------------------------------- */
 let ok = 0;
 let fail = 0;
