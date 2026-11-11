@@ -26,6 +26,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Chequeos de lógica (sin DOM)
+        run: npm run checks
+
       - name: Build
         run: npm run build
 

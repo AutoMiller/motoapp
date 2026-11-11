@@ -34,6 +34,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5181",
     "typecheck": "tsc --noEmit",
+    "checks": "node tools/checks/run.mjs",
     "build:gas": "tsc --noEmit && vite build --mode gas && node tools/copiar-gas.mjs"
   },
   "dependencies": {
