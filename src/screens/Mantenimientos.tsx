@@ -267,11 +267,7 @@ export function Mantenimientos({
 
           {tabMode === "table" ? (
             registros.length > 0 ? (
-              <TablaMantenimientos
-                registros={registros}
-                onEdit={setEditando}
-                onExport={exportarCSV}
-              />
+              <TablaMantenimientos registros={registros} onEdit={setEditando} />
             ) : (
               <EmptyState
                 icon={<CalendarDays size={22} />}
@@ -406,11 +402,9 @@ function Th({
 function TablaMantenimientos({
   registros,
   onEdit,
-  onExport,
 }: {
   registros: Mantenimiento[];
   onEdit: (m: Mantenimiento) => void;
-  onExport: () => void;
 }) {
   const [sortCol, setSortCol] = useState<"fecha" | "km" | "titulo" | "costo">("fecha");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -442,53 +436,60 @@ function TablaMantenimientos({
   if (sorted.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex justify-end">
-        <button className="btn btn-ghost text-[0.75rem] px-3 py-1.5" onClick={onExport}>
-          <Download size={14} /> Exportar CSV
-        </button>
-      </div>
-      <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
-        <table className="w-full min-w-[540px] text-left">
-          <thead className="sticky top-0 border-b border-[var(--line)] bg-[var(--surface)]">
-            <tr>
-              <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Fecha</Th>
-              <Th col="km" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Km</Th>
-              <Th col="titulo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Ítem</Th>
-              <Th col="costo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">Costo</Th>
-              <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">Taller</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--line)]">
-            {sorted.map((m) => {
-              const meta = CATEGORIAS[m.categoria];
-              return (
-                <tr
-                  key={m.id}
-                  className="cursor-pointer transition-colors hover:bg-[var(--surface-2)]"
-                  onClick={() => onEdit(m)}
-                >
-                  <td className="ink nums px-2 py-2 text-[0.78rem] font-medium">{formatDate(m.fecha)}</td>
-                  <td className="ink-2 nums px-2 py-2 text-[0.78rem]">{num(m.km)}</td>
-                  <td className="px-2 py-2 text-[0.78rem]">
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg" style={{ background: `${meta.color}18`, color: meta.color }}>
-                        <Icono nombre={meta.icono} size={12} />
-                      </span>
-                      <span className="ink font-semibold">{m.titulo}</span>
-                    </div>
-                    <div className="ink-3 text-[0.65rem] sm:hidden">
-                      {money(m.costo)}{m.taller ? ` · ${m.taller}` : ""}
-                    </div>
-                  </td>
-                  <td className="nums ink px-2 py-2 text-[0.78rem] font-semibold hidden sm:table-cell">{money(m.costo)}</td>
-                  <td className="ink-2 px-2 py-2 text-[0.78rem] hidden sm:table-cell">{m.taller ?? "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className="rounded-2xl border border-[var(--line)]">
+      <table className="w-full table-fixed text-left">
+        <colgroup>
+          <col className="w-[74px]" />
+          <col className="w-[58px]" />
+          <col />
+          <col className="hidden sm:table-column sm:w-[86px]" />
+          <col className="hidden sm:table-column sm:w-[110px]" />
+        </colgroup>
+        <thead className="border-b border-[var(--line)] bg-[var(--surface)]">
+          <tr>
+            <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Fecha</Th>
+            <Th col="km" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Km</Th>
+            <Th col="titulo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Ítem</Th>
+            <Th col="costo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">Costo</Th>
+            <th className="ink-2 hidden px-2 py-2 text-left text-[0.68rem] font-bold uppercase tracking-wider sm:table-cell">Taller</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--line)]">
+          {sorted.map((m) => {
+            const meta = CATEGORIAS[m.categoria];
+            return (
+              <tr
+                key={m.id}
+                className="cursor-pointer transition-colors hover:bg-[var(--surface-2)]"
+                onClick={() => onEdit(m)}
+              >
+                <td className="ink nums px-2 py-2 text-[0.7rem] font-medium leading-tight">
+                  <span className="block">
+                    {new Date(`${m.fecha}T00:00:00`)
+                      .toLocaleDateString("es-CO", { day: "2-digit", month: "short" })
+                      .replace(" de ", " ")}
+                  </span>
+                  <span className="ink-3 block text-[0.62rem]">{m.fecha.slice(0, 4)}</span>
+                </td>
+                <td className="ink-2 nums px-2 py-2 text-[0.72rem]">{num(m.km)}</td>
+                <td className="min-w-0 px-2 py-2 text-[0.76rem]">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg" style={{ background: `${meta.color}18`, color: meta.color }}>
+                      <Icono nombre={meta.icono} size={12} />
+                    </span>
+                    <span className="ink min-w-0 truncate font-semibold">{m.titulo}</span>
+                  </div>
+                  <div className="ink-3 truncate text-[0.65rem] sm:hidden">
+                    {money(m.costo)}{m.taller ? ` · ${m.taller}` : ""}
+                  </div>
+                </td>
+                <td className="nums ink hidden px-2 py-2 text-[0.76rem] font-semibold sm:table-cell">{money(m.costo)}</td>
+                <td className="ink-2 hidden truncate px-2 py-2 text-[0.76rem] sm:table-cell">{m.taller ?? "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

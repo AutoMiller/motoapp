@@ -557,9 +557,17 @@ function TablaViajes({
   if (sorted.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
-      <table className="w-full min-w-[540px] text-left">
-        <thead className="sticky top-0 border-b border-[var(--line)] bg-[var(--surface)]">
+    <div className="rounded-2xl border border-[var(--line)]">
+      <table className="w-full table-fixed text-left">
+        <colgroup>
+          <col />
+          <col className="w-[86px]" />
+          <col className="w-[54px]" />
+          <col className="hidden sm:table-column sm:w-[54px]" />
+          <col className="hidden sm:table-column sm:w-[54px]" />
+          <col className="w-[30px]" />
+        </colgroup>
+        <thead className="border-b border-[var(--line)] bg-[var(--surface)]">
           <tr>
             <Th col="ruta" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Ruta</Th>
             <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Fecha</Th>
@@ -577,12 +585,12 @@ function TablaViajes({
                 key={x.id}
                 className="group transition-colors hover:bg-[var(--surface-2)]"
               >
-                <td className="ink px-2 py-2 text-[0.78rem] font-semibold">
-                  <div className="flex items-center gap-1.5">
-                    {x.nombre}
-                    {x.ida_y_vuelta && <Chip tono="neutral" className="text-[0.6rem] px-1.5 py-0.5">ida/vuelta</Chip>}
+                <td className="ink min-w-0 px-2 py-2 text-[0.76rem] font-semibold">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="min-w-0 truncate">{x.nombre}</span>
+                    {x.ida_y_vuelta && <Chip tono="neutral" className="shrink-0 text-[0.6rem] px-1.5 py-0.5">ida/vuelta</Chip>}
                   </div>
-                  <div className="ink-3 text-[0.65rem] sm:hidden">
+                  <div className="ink-3 truncate text-[0.65rem] sm:hidden">
                     {r ? `${num(r.kmL, 1)} km/l` : ""}{x.litros ? ` · ${num(x.litros, 1)} l` : ""}
                   </div>
                 </td>
