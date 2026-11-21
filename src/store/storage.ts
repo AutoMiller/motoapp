@@ -36,6 +36,14 @@ export async function cargarEstado(): Promise<AppState | null> {
   }
 }
 
+/** Lanza si el almacenamiento del navegador está lleno. */
+export class StorageFullError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageFullError";
+  }
+}
+
 export async function escribirEstado(state: AppState): Promise<void> {
   try {
     const db = await abrirDB();
@@ -45,11 +53,23 @@ export async function escribirEstado(state: AppState): Promise<void> {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-  } catch {
+  } catch (err: any) {
+    const isQuota =
+      err?.name === "QuotaExceededError" ||
+      err?.code === 22 || // DOMException QUOTA_EXCEEDED_ERR
+      err?.name === "NS_ERROR_DOM_QUOTA_REACHED"; // Firefox
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch {
-      /* sin almacenamiento disponible */
+      if (isQuota) {
+        throw new StorageFullError(
+          "No se pudo guardar: almacenamiento lleno. Exporta un respaldo y borra fotos."
+        );
+      }
+      // Otro error de escritura — también lo propagamos para no fallar en silencio
+      throw new StorageFullError(
+        "No se pudo guardar los datos en este navegador. Exporta un respaldo como precaución."
+      );
     }
   }
 }

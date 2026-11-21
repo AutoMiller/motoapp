@@ -151,7 +151,7 @@ export function Dashboard({
   }, [timer]);
 
   const ds = useMemo(() => desgastes(state), [state]);
-  const salud = saludVehiculo(state);
+  const salud = useMemo(() => saludVehiculo(state), [state]);
   if (!v) return null;
 
   const aceite = state.componentes.find((c) => c.categoria === "aceite");
@@ -159,7 +159,7 @@ export function Dashboard({
   const ultimoTanqueo = [...state.mantenimientos]
     .filter((m) => m.tanqueo)
     .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))[0];
-  const comb = resumenCombustible(state);
+  const comb = useMemo(() => resumenCombustible(state), [state]);
   const kmL = comb.promedioKmL > 0 ? comb.promedioKmL : CONSUMO_REF_KML;
 
   const trip1 = ultimoTanqueo ? Math.max(0, v.kmActual - ultimoTanqueo.km) : 0;
@@ -189,7 +189,7 @@ export function Dashboard({
   const ciudad = ciudadPorId(state.ajustes.ciudad);
   const pico = evaluarPicoPlaca(v.placa, isoDate(), ciudad, true, state.ajustes.picoPlacaDigitos);
   const mes = totalMes(state, 0);
-  const porKm = costoPorKm(state);
+  const porKm = useMemo(() => costoPorKm(state), [state]);
   const serie = totalPorMes(state, 6).map((m) => ({ label: m.key.slice(5), value: m.total }));
 
   const lcdItems = [
