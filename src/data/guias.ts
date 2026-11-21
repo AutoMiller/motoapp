@@ -55,7 +55,7 @@ export const GUIAS: Guia[] = [
       {
         titulo: "Tensión",
         items: [
-          "Juego vertical recomendado: 25-35 mm en el punto medio del tramo inferior",
+          "Juego vertical recomendado: 30-40 mm en el punto medio del tramo inferior" /* manual pág. 75 */,
           "Medir con la moto en el piso, sin carga y sin el caballete",
           "Cadena muy tensa castiga el eje de salida; muy floja se sale",
         ],
@@ -78,7 +78,7 @@ export const GUIAS: Guia[] = [
       {
         titulo: "Cada cuánto",
         items: [
-          "Cada 5.000 km o 4 meses, lo que ocurra primero",
+          "Cada 5.000 km o 6 meses, lo que ocurra primero" /* manual pág. 57 */,
           "En uso intenso de trocha o mucho polvo, adelantar a 3.000 km",
         ],
       },
