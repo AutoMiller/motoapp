@@ -176,9 +176,22 @@ export interface Ajustes {
   picoPlacaActivo: boolean;
 }
 
+/** Enlace guardado: manual, tutorial, repuesto… o una guía interna de la app. */
+export interface Recurso {
+  id: ID;
+  titulo: string;
+  /** URL externa; vacía si `guia` apunta a una página interna. */
+  url: string;
+  nota?: string;
+  etiqueta?: "manual" | "repuesto" | "video" | "tutorial" | "otro";
+  /** id de una guía interna (src/data/guias.ts): se abre dentro de la app. */
+  guia?: string;
+}
+
 export interface AppState {
   version: number;
   vehiculo: Vehiculo | null;
+  recursos: Recurso[];
   documentos: Documento[];
   componentes: Componente[];
   mantenimientos: Mantenimiento[];

@@ -12,6 +12,7 @@ import { FICHA_XTZ250, ENLACES_UTILES } from "../data/ficha";
 import { comprimirImagen } from "../lib/archivos";
 import { proximaRTM } from "../lib/legal";
 import { ModalComponente, ModalDocumento, ModalVehiculo } from "../components/formularios";
+import { Recursos } from "../components/Recursos";
 
 export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMantenimiento) => void }) {
   const { state, capacidades, guardarVehiculo, borrarDocumento } = useApp();
@@ -208,6 +209,8 @@ export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMan
           <Plus size={15} /> Registrar servicio hecho
         </button>
       </div>
+
+      <Recursos />
 
       {/* Datos legales rápidos */}
       <div className="card p-4">

@@ -8,6 +8,7 @@ import type {
   ID,
   Mantenimiento,
   OrdenServicio,
+  Recurso,
   Taller,
   Vehiculo,
 } from "../types";
@@ -166,6 +167,21 @@ export function aplicarMutacion(state: AppState, accion: string, datos: unknown)
           ? state.tareas.map((x) => (x.id === t.id ? t : x))
           : [...state.tareas, t],
       };
+    }
+
+    case "recurso:guardar": {
+      const r = datos as Recurso;
+      return {
+        ...state,
+        recursos: state.recursos.some((x) => x.id === r.id)
+          ? state.recursos.map((x) => (x.id === r.id ? r : x))
+          : [...state.recursos, r],
+      };
+    }
+
+    case "recurso:borrar": {
+      const id = datos as ID;
+      return { ...state, recursos: state.recursos.filter((r) => r.id !== id) };
     }
 
     case "tarea:borrar": {

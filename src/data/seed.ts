@@ -38,6 +38,7 @@ export function estadoInicial(): AppState {
     talleres: [],
     ordenes: [],
     puntos: [],
+    recursos: [],
     tareas: [],
     ajustes: ajustesPorDefecto(),
     onboardingCompleto: false,
@@ -156,6 +157,7 @@ export function migrar(s: AppState): AppState {
     talleres: s.talleres ?? [],
     ordenes: s.ordenes ?? [],
     puntos: s.puntos ?? [],
+    recursos: s.recursos ?? [],
     tareas: s.tareas ?? [],
     ajustes: { ...ajustesPorDefecto(), ...(s.ajustes ?? {}) },
     version: VERSION_ESTADO,
@@ -273,6 +275,7 @@ export function estadoDemo(): AppState {
   return {
     version: VERSION_ESTADO,
     vehiculo,
+    recursos: [],
     documentos,
     componentes,
     mantenimientos,

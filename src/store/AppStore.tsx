@@ -8,6 +8,7 @@ import type {
   ID,
   Mantenimiento,
   OrdenServicio,
+  Recurso,
   Taller,
   Tarea,
   Vehiculo,
@@ -48,6 +49,8 @@ interface Ctx {
   borrarOrden: (id: ID) => void;
   guardarTarea: (t: Tarea) => void;
   borrarTarea: (id: ID) => void;
+  guardarRecurso: (r: Recurso) => void;
+  borrarRecurso: (id: ID) => void;
   inicializarTareas: (lista: Tarea[]) => void;
   reiniciarTareas: (lista: Tarea[]) => void;
   guardarAjustes: (patch: Partial<Ajustes>) => void;
@@ -273,6 +276,8 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
       borrarOrden: (id) => mutarSeguro("orden:borrar", id),
       guardarTarea: (t) => mutarSeguro("tarea:guardar", t),
       borrarTarea: (id) => mutarSeguro("tarea:borrar", id),
+      guardarRecurso: (r) => mutarSeguro("recurso:guardar", r),
+      borrarRecurso: (id) => mutarSeguro("recurso:borrar", id),
       inicializarTareas: (lista) => mutarSeguro("tareas:inicializar", lista),
       reiniciarTareas: (lista) => mutarSeguro("tareas:reiniciar", lista),
       guardarAjustes: (patch) => mutarSeguro("ajustes", patch),
