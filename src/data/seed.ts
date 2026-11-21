@@ -7,6 +7,7 @@ import type {
   Mantenimiento,
   PuntoEvento,
   Vehiculo,
+  Viaje,
 } from "../types";
 import { isoDate } from "../lib/format";
 import { PLAN_XTZ250, type DefComponente } from "./catalogo";
@@ -40,6 +41,7 @@ export function estadoInicial(): AppState {
     puntos: [],
     recursos: [],
     tareas: [],
+    viajes: [],
     ajustes: ajustesPorDefecto(),
     onboardingCompleto: false,
   };
@@ -159,6 +161,7 @@ export function migrar(s: AppState): AppState {
     puntos: s.puntos ?? [],
     recursos: s.recursos ?? [],
     tareas: s.tareas ?? [],
+    viajes: s.viajes ?? [],
     ajustes: { ...ajustesPorDefecto(), ...(s.ajustes ?? {}) },
     version: VERSION_ESTADO,
   };
@@ -272,6 +275,35 @@ export function estadoDemo(): AppState {
     { id: "p-5", fecha: "2023-03-15", motivo: "Configuraste tu moto", puntos: 50 },
   ];
 
+  const viajes: Viaje[] = [
+    {
+      id: "viaje-1",
+      vehiculoId,
+      nombre: "Villavicencio → Restrepo",
+      fecha: "2026-09-27",
+      kmInicio: 8950,
+      kmFin: 9030,
+      litros: 2.9,
+      costo: 46_400,
+      ida_y_vuelta: true,
+      notas: "Vía El Calvario, con parada en el mirador.",
+    },
+    {
+      id: "viaje-2",
+      vehiculoId,
+      nombre: "Bogotá → La Vega",
+      fecha: "2026-10-04",
+      kmInicio: 9030,
+      kmFin: 9140,
+      litros: 4.1,
+      costo: 65_600,
+      ida_y_vuelta: false,
+    },
+    { id: "viaje-3", vehiculoId, nombre: "La Vega → Villeta", fecha: "2026-10-18", kmInicio: 9140, kmFin: 9260, litros: 4, costo: 64_000, ida_y_vuelta: true },
+    { id: "viaje-4", vehiculoId, nombre: "Bogotá → Guatavita", fecha: "2026-11-01", kmInicio: 9260, kmFin: 9360, litros: 3.2, costo: 51_200, ida_y_vuelta: true },
+    { id: "viaje-5", vehiculoId, nombre: "Villavicencio → Puerto López", fecha: "2026-11-15", kmInicio: 9360, kmFin: 9420, litros: 2.1, costo: 33_600, ida_y_vuelta: false },
+  ];
+
   return {
     version: VERSION_ESTADO,
     vehiculo,
@@ -289,6 +321,7 @@ export function estadoDemo(): AppState {
     ordenes: [],
     puntos,
     tareas: TAREAS_SEED.map((t) => ({ ...t })),
+    viajes,
     ajustes: {
       ...ajustesPorDefecto(),
       nombre: "Miller",

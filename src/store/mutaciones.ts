@@ -11,6 +11,7 @@ import type {
   Recurso,
   Taller,
   Vehiculo,
+  Viaje,
 } from "../types";
 import { estadoInicial, migrar } from "../data/seed";
 import { isoDate } from "../lib/format";
@@ -182,6 +183,21 @@ export function aplicarMutacion(state: AppState, accion: string, datos: unknown)
     case "recurso:borrar": {
       const id = datos as ID;
       return { ...state, recursos: state.recursos.filter((r) => r.id !== id) };
+    }
+
+    case "viaje:guardar": {
+      const v = datos as Viaje;
+      return {
+        ...state,
+        viajes: state.viajes.some((x) => x.id === v.id)
+          ? state.viajes.map((x) => (x.id === v.id ? v : x))
+          : [v, ...state.viajes],
+      };
+    }
+
+    case "viaje:borrar": {
+      const id = datos as ID;
+      return { ...state, viajes: state.viajes.filter((v) => v.id !== id) };
     }
 
     case "tarea:borrar": {

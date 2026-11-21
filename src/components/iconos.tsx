@@ -23,6 +23,7 @@ import {
   Wind,
   Wrench,
   Zap,
+  Route,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +52,7 @@ const MAPA: Record<string, LucideIcon> = {
   Wind,
   Wrench,
   Zap,
+  Route,
 };
 
 export function Icono({ nombre, size = 18, className }: { nombre: string; size?: number; className?: string }) {
