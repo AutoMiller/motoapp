@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Filter, Plus, Wrench } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { CalendarDays, ChevronDown, Download, Filter, Plus, Wrench } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import type { CategoriaMantenimiento, Mantenimiento } from "../types";
 import { CATEGORIAS, CATEGORIAS_LISTA } from "../data/catalogo";
@@ -8,6 +8,58 @@ import { formatDate, isoDate, money, monthLabel, num } from "../lib/format";
 import { Chip, EmptyState, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
 import { ModalComponente, ModalMantenimiento } from "../components/formularios";
+
+type TabMode = "cards" | "table";
+type SortDir = "asc" | "desc";
+
+/** Lee o escribe la preferencia de vista en localStorage. */
+function useVista(pantalla: string): [TabMode, (v: TabMode) => void] {
+  const key = `motoapp:vista:${pantalla}`;
+  const [vista, setVista] = useState<TabMode>(() => {
+    try {
+      return (localStorage.getItem(key) as TabMode) ?? "cards";
+    } catch {
+      return "cards";
+    }
+  });
+  const set = (v: TabMode) => {
+    setVista(v);
+    try { localStorage.setItem(key, v); } catch { /* noop */ }
+  };
+  return [vista, set];
+}
+
+/** Escapa un valor para CSV: comillas dobles internas y envuelve si hay separador/salto. */
+function csvField(v: string | number | undefined | null): string {
+  if (v === undefined || v === null) return "";
+  const s = String(v).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (/[";\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** Genera CSV con BOM UTF-8 y separador ; (Excel es-CO). */
+function descargarCSV(registros: Mantenimiento[], fecha: string) {
+  const header = ["Fecha", "Km", "Ítem", "Tipo", "Costo", "Taller", "Descripción"];
+  const rows = registros.map((m) => [
+    m.fecha,
+    m.km,
+    m.titulo,
+    m.tipo,
+    m.costo,
+    m.taller ?? "",
+    m.descripcion ?? "",
+  ]);
+  const lines = [header, ...rows].map((r) => r.map(csvField).join(";"));
+  const bom = "\uFEFF";
+  const csv = bom + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mantenimientos-${fecha}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 type Vista = "proximos" | "historial" | "plan";
 
@@ -18,12 +70,17 @@ export function Mantenimientos({
 }) {
   const { state } = useApp();
   const [vista, setVista] = useState<Vista>("proximos");
+  const [tabMode, setTabMode] = useVista("mantenimientos");
   const v = state.vehiculo;
   const ds = useMemo(() => desgastes(state), [state]);
   const ritmo = useMemo(() => ritmoKmDiario(state), [state]);
 
   // Historial
   const todos = gastos(state);
+
+  const exportarCSV = useCallback(() => {
+    descargarCSV(todos, isoDate());
+  }, [todos]);
   const anios = useMemo(() => {
     const set = new Set(todos.map((m) => m.fecha.slice(0, 4)));
     set.add(isoDate().slice(0, 4));
@@ -190,7 +247,44 @@ export function Mantenimientos({
             ))}
           </div>
 
-          {agrupado.length === 0 ? (
+          {/* Toggle Tarjetas | Tabla */}
+          <div className="flex items-center justify-between">
+            <Segmented
+              value={tabMode}
+              onChange={setTabMode}
+              size="sm"
+              options={[
+                { value: "cards", label: "Tarjetas" },
+                { value: "table", label: "Tabla" },
+              ]}
+            />
+            {registros.length > 0 && (
+              <button className="btn btn-ghost text-[0.72rem] px-2.5 py-1.5" onClick={exportarCSV}>
+                <Download size={13} /> Exportar CSV
+              </button>
+            )}
+          </div>
+
+          {tabMode === "table" ? (
+            registros.length > 0 ? (
+              <TablaMantenimientos
+                registros={registros}
+                onEdit={setEditando}
+                onExport={exportarCSV}
+              />
+            ) : (
+              <EmptyState
+                icon={<CalendarDays size={22} />}
+                title="Sin registros en este año"
+                description="Cuando registres un servicio o un tanqueo aparecerá aquí, agrupado por mes."
+                action={
+                  <button className="btn btn-primary" onClick={() => onServicio()}>
+                    Registrar el primero
+                  </button>
+                }
+              />
+            )
+          ) : agrupado.length === 0 ? (
             <EmptyState
               icon={<CalendarDays size={22} />}
               title="Sin registros en este año"
@@ -260,6 +354,141 @@ function MiniStat({ label, valor, tono }: { label: string; valor: number; tono: 
       <p className="nums text-lg font-extrabold" style={{ color: tono }}>
         {valor}
       </p>
+    </div>
+  );
+}
+
+/** Flecha de ordenación en la cabecera de tabla. */
+function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="inline-block w-3" />;
+  return (
+    <span className="inline-block w-3 text-[0.6rem]">
+      {dir === "asc" ? "▲" : "▼"}
+    </span>
+  );
+}
+
+/** Cabecera de columna con ordenación. */
+function Th({
+  children,
+  col,
+  sortCol,
+  sortDir,
+  onSort,
+  className = "",
+}: {
+  children: React.ReactNode;
+  col: string;
+  sortCol: string;
+  sortDir: SortDir;
+  onSort: (c: string) => void;
+  className?: string;
+}) {
+  const active = col === sortCol;
+  return (
+    <th
+      className={`ink-2 cursor-pointer select-none px-2 py-2 text-left text-[0.68rem] font-bold uppercase tracking-wider ${className}`}
+      onClick={() => onSort(col)}
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      role="columnheader"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSort(col); }}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <SortArrow active={active} dir={sortDir} />
+      </span>
+    </th>
+  );
+}
+
+/** Tabla de mantenimientos. */
+function TablaMantenimientos({
+  registros,
+  onEdit,
+  onExport,
+}: {
+  registros: Mantenimiento[];
+  onEdit: (m: Mantenimiento) => void;
+  onExport: () => void;
+}) {
+  const [sortCol, setSortCol] = useState<"fecha" | "km" | "titulo" | "costo">("fecha");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const handleSort = useCallback((col: string) => {
+    const c = col as "fecha" | "km" | "titulo" | "costo";
+    setSortCol((prev) => {
+      if (prev === c) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return c;
+      }
+      setSortDir("asc");
+      return c;
+    });
+  }, []);
+
+  const sorted = useMemo(() => {
+    const s = [...registros].sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === "fecha") cmp = a.fecha.localeCompare(b.fecha);
+      else if (sortCol === "km") cmp = a.km - b.km;
+      else if (sortCol === "titulo") cmp = a.titulo.localeCompare(b.titulo, "es");
+      else if (sortCol === "costo") cmp = a.costo - b.costo;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return s;
+  }, [registros, sortCol, sortDir]);
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-end">
+        <button className="btn btn-ghost text-[0.75rem] px-3 py-1.5" onClick={onExport}>
+          <Download size={14} /> Exportar CSV
+        </button>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
+        <table className="w-full min-w-[540px] text-left">
+          <thead className="sticky top-0 border-b border-[var(--line)] bg-[var(--surface)]">
+            <tr>
+              <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Fecha</Th>
+              <Th col="km" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Km</Th>
+              <Th col="titulo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Ítem</Th>
+              <Th col="costo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">Costo</Th>
+              <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">Taller</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--line)]">
+            {sorted.map((m) => {
+              const meta = CATEGORIAS[m.categoria];
+              return (
+                <tr
+                  key={m.id}
+                  className="cursor-pointer transition-colors hover:bg-[var(--surface-2)]"
+                  onClick={() => onEdit(m)}
+                >
+                  <td className="ink nums px-2 py-2 text-[0.78rem] font-medium">{formatDate(m.fecha)}</td>
+                  <td className="ink-2 nums px-2 py-2 text-[0.78rem]">{num(m.km)}</td>
+                  <td className="px-2 py-2 text-[0.78rem]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg" style={{ background: `${meta.color}18`, color: meta.color }}>
+                        <Icono nombre={meta.icono} size={12} />
+                      </span>
+                      <span className="ink font-semibold">{m.titulo}</span>
+                    </div>
+                    <div className="ink-3 text-[0.65rem] sm:hidden">
+                      {money(m.costo)}{m.taller ? ` · ${m.taller}` : ""}
+                    </div>
+                  </td>
+                  <td className="nums ink px-2 py-2 text-[0.78rem] font-semibold hidden sm:table-cell">{money(m.costo)}</td>
+                  <td className="ink-2 px-2 py-2 text-[0.78rem] hidden sm:table-cell">{m.taller ?? "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
