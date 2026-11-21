@@ -1,9 +1,68 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { Flag, MapPin, Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { Download, Flag, MapPin, Plus, Trash2 } from "lucide-react";
 import type { Viaje } from "../types";
 import { useApp } from "../store/AppStore";
-import { Chip, EmptyState, Field } from "../components/ui";
+import { Chip, EmptyState, Field, Segmented } from "../components/ui";
 import { formatDate, formatFechaCorta, isoDate, money, num } from "../lib/format";
+
+type TabMode = "cards" | "table";
+type SortDir = "asc" | "desc";
+
+/** Lee o escribe la preferencia de vista en localStorage. */
+function useVista(pantalla: string): [TabMode, (v: TabMode) => void] {
+  const key = `motoapp:vista:${pantalla}`;
+  const [vista, setVista] = useState<TabMode>(() => {
+    try {
+      return (localStorage.getItem(key) as TabMode) ?? "cards";
+    } catch {
+      return "cards";
+    }
+  });
+  const set = (v: TabMode) => {
+    setVista(v);
+    try { localStorage.setItem(key, v); } catch { /* noop */ }
+  };
+  return [vista, set];
+}
+
+/** Escapa un valor para CSV: comillas dobles internas y envuelve si hay separador/salto. */
+function csvField(v: string | number | undefined | null): string {
+  if (v === undefined || v === null) return "";
+  const s = String(v).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (/[";\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** Genera CSV con BOM UTF-8 y separador ; (Excel es-CO). */
+function descargarCSV(viajes: Viaje[], fecha: string) {
+  const header = ["Ruta", "Fecha", "Km inicio", "Km fin", "Km recorrido", "Litros", "km/L", "Costo", "Ida y vuelta", "Notas"];
+  const rows = viajes.map((v) => {
+    const km = Math.max(0, v.kmFin - v.kmInicio);
+    const kmL = v.litros && v.litros > 0 && km > 0 ? +(km / v.litros).toFixed(1) : "";
+    return [
+      v.nombre,
+      v.fecha,
+      v.kmInicio,
+      v.kmFin,
+      km,
+      v.litros ?? "",
+      kmL,
+      v.costo ?? "",
+      v.ida_y_vuelta ? "Sí" : "",
+      v.notas ?? "",
+    ];
+  });
+  const lines = [header, ...rows].map((r) => r.map(csvField).join(";"));
+  const bom = "\uFEFF";
+  const csv = bom + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `viajes-${fecha}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /** Lee "9.420" o "9420" y devuelve 9420 (los km se guardan enteros). */
 function aEntero(texto: string): number {
@@ -48,6 +107,7 @@ function ordenarDesc(lista: Viaje[]): Viaje[] {
 export function Viajes() {
   const { state, guardarViaje, borrarViaje } = useApp();
   const v = state.vehiculo;
+  const [tabMode, setTabMode] = useVista("viajes");
 
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState(isoDate());
@@ -60,6 +120,10 @@ export function Viajes() {
   const [error, setError] = useState("");
 
   const viajes = useMemo(() => ordenarDesc(state.viajes), [state.viajes]);
+
+  const exportarCSV = useCallback(() => {
+    descargarCSV(state.viajes, isoDate());
+  }, [state.viajes]);
 
   const totalKm = viajes.reduce((a, x) => a + kmDe(x), 0);
   const totalLitros = viajes.reduce((a, x) => a + (x.litros ?? 0), 0);
@@ -253,52 +317,74 @@ export function Viajes() {
           description="Registra la ruta, el odómetro de salida y de llegada. Si anotas los litros, la app te dice cuánto rinde la moto en ese recorrido."
         />
       ) : (
-        <div className="flex flex-col gap-2">
-          {viajes.map((x) => {
-            const km = kmDe(x);
-            const r = rendimientoDe(x);
-            return (
-              <div key={x.id} className="card p-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <h3 className="ink text-[0.88rem] font-bold leading-snug">{x.nombre}</h3>
-                      {x.ida_y_vuelta && <Chip tono="neutral">ida y vuelta</Chip>}
+        <>
+          {/* Toggle Tarjetas | Tabla */}
+          <div className="flex items-center justify-between">
+            <Segmented
+              value={tabMode}
+              onChange={setTabMode}
+              size="sm"
+              options={[
+                { value: "cards", label: "Tarjetas" },
+                { value: "table", label: "Tabla" },
+              ]}
+            />
+            <button className="btn btn-ghost text-[0.72rem] px-2.5 py-1.5" onClick={exportarCSV}>
+              <Download size={13} /> Exportar CSV
+            </button>
+          </div>
+
+          {tabMode === "table" ? (
+            <TablaViajes viajes={viajes} onBorrar={borrarViaje} />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {viajes.map((x) => {
+                const km = kmDe(x);
+                const r = rendimientoDe(x);
+                return (
+                  <div key={x.id} className="card p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h3 className="ink text-[0.88rem] font-bold leading-snug">{x.nombre}</h3>
+                          {x.ida_y_vuelta && <Chip tono="neutral">ida y vuelta</Chip>}
+                        </div>
+                        <p className="ink-3 nums text-[0.68rem]">
+                          {formatDate(x.fecha)} · {num(x.kmInicio)} → {num(x.kmFin)} km
+                        </p>
+                      </div>
+                      <button
+                        className="icon-btn shrink-0"
+                        onClick={() => {
+                          if (window.confirm(`¿Borrar el viaje «${x.nombre}»?`)) borrarViaje(x.id);
+                        }}
+                        aria-label={`Borrar ${x.nombre}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <p className="ink-3 nums text-[0.68rem]">
-                      {formatDate(x.fecha)} · {num(x.kmInicio)} → {num(x.kmFin)} km
-                    </p>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Chip tono="brand">{num(km)} km</Chip>
+                      {r ? (
+                        <>
+                          <Chip tono={r.kmL >= 25 ? "ok" : r.kmL >= 18 ? "warn" : "bad"}>{num(r.kmL, 1)} km/l</Chip>
+                          <Chip tono="info">{num(r.l100, 1)} L/100 km</Chip>
+                        </>
+                      ) : (
+                        <span className="ink-3 text-[0.68rem]">Sin litros: no se puede calcular el rendimiento</span>
+                      )}
+                      {x.litros ? <span className="ink-2 nums text-[0.68rem]">{num(x.litros, 1)} l</span> : null}
+                      {x.costo ? <span className="ink-2 nums text-[0.68rem]">· {money(x.costo)}</span> : null}
+                    </div>
+
+                    {x.notas && <p className="ink-2 mt-1.5 text-[0.7rem]">{x.notas}</p>}
                   </div>
-                  <button
-                    className="icon-btn shrink-0"
-                    onClick={() => {
-                      if (window.confirm(`¿Borrar el viaje «${x.nombre}»?`)) borrarViaje(x.id);
-                    }}
-                    aria-label={`Borrar ${x.nombre}`}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Chip tono="brand">{num(km)} km</Chip>
-                  {r ? (
-                    <>
-                      <Chip tono={r.kmL >= 25 ? "ok" : r.kmL >= 18 ? "warn" : "bad"}>{num(r.kmL, 1)} km/l</Chip>
-                      <Chip tono="info">{num(r.l100, 1)} L/100 km</Chip>
-                    </>
-                  ) : (
-                    <span className="ink-3 text-[0.68rem]">Sin litros: no se puede calcular el rendimiento</span>
-                  )}
-                  {x.litros ? <span className="ink-2 nums text-[0.68rem]">{num(x.litros, 1)} l</span> : null}
-                  {x.costo ? <span className="ink-2 nums text-[0.68rem]">· {money(x.costo)}</span> : null}
-                </div>
-
-                {x.notas && <p className="ink-2 mt-1.5 text-[0.7rem]">{x.notas}</p>}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -382,5 +468,154 @@ function GraficoRendimiento({
         </g>
       ))}
     </svg>
+  );
+}
+
+/** Flecha de ordenación en la cabecera de tabla. */
+function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="inline-block w-3" />;
+  return (
+    <span className="inline-block w-3 text-[0.6rem]">
+      {dir === "asc" ? "▲" : "▼"}
+    </span>
+  );
+}
+
+/** Cabecera de columna con ordenación. */
+function Th({
+  children,
+  col,
+  sortCol,
+  sortDir,
+  onSort,
+  className = "",
+}: {
+  children: React.ReactNode;
+  col: string;
+  sortCol: string;
+  sortDir: SortDir;
+  onSort: (c: string) => void;
+  className?: string;
+}) {
+  const active = col === sortCol;
+  return (
+    <th
+      className={`ink-2 cursor-pointer select-none px-2 py-2 text-left text-[0.68rem] font-bold uppercase tracking-wider ${className}`}
+      onClick={() => onSort(col)}
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      role="columnheader"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSort(col); }}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <SortArrow active={active} dir={sortDir} />
+      </span>
+    </th>
+  );
+}
+
+/** Tabla de viajes. */
+function TablaViajes({
+  viajes,
+  onBorrar,
+}: {
+  viajes: Viaje[];
+  onBorrar: (id: string) => void;
+}) {
+  const [sortCol, setSortCol] = useState<"fecha" | "km" | "ruta" | "kmL">("fecha");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const handleSort = useCallback((col: string) => {
+    const c = col as "fecha" | "km" | "ruta" | "kmL";
+    setSortCol((prev) => {
+      if (prev === c) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return c;
+      }
+      setSortDir("asc");
+      return c;
+    });
+  }, []);
+
+  const sorted = useMemo(() => {
+    const s = [...viajes].sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === "fecha") cmp = a.fecha.localeCompare(b.fecha);
+      else if (sortCol === "km") cmp = kmDe(a) - kmDe(b);
+      else if (sortCol === "ruta") cmp = a.nombre.localeCompare(b.nombre, "es");
+      else if (sortCol === "kmL") {
+        const ra = rendimientoDe(a);
+        const rb = rendimientoDe(b);
+        cmp = (ra?.kmL ?? -1) - (rb?.kmL ?? -1);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return s;
+  }, [viajes, sortCol, sortDir]);
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
+      <table className="w-full min-w-[540px] text-left">
+        <thead className="sticky top-0 border-b border-[var(--line)] bg-[var(--surface)]">
+          <tr>
+            <Th col="ruta" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Ruta</Th>
+            <Th col="fecha" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Fecha</Th>
+            <Th col="km" sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>Km</Th>
+            <Th col="kmL" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell">km/L</Th>
+            <th className="ink-2 px-2 py-2 text-[0.68rem] font-bold uppercase tracking-wider hidden sm:table-cell">Litros</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--line)]">
+          {sorted.map((x) => {
+            const km = kmDe(x);
+            const r = rendimientoDe(x);
+            return (
+              <tr
+                key={x.id}
+                className="group transition-colors hover:bg-[var(--surface-2)]"
+              >
+                <td className="ink px-2 py-2 text-[0.78rem] font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    {x.nombre}
+                    {x.ida_y_vuelta && <Chip tono="neutral" className="text-[0.6rem] px-1.5 py-0.5">ida/vuelta</Chip>}
+                  </div>
+                  <div className="ink-3 text-[0.65rem] sm:hidden">
+                    {r ? `${num(r.kmL, 1)} km/l` : ""}{x.litros ? ` · ${num(x.litros, 1)} l` : ""}
+                  </div>
+                </td>
+                <td className="ink-2 nums px-2 py-2 text-[0.78rem]">{formatDate(x.fecha)}</td>
+                <td className="ink nums px-2 py-2 text-[0.78rem] font-medium">{num(km)}</td>
+                <td className="nums px-2 py-2 text-[0.78rem] hidden sm:table-cell">
+                  {r ? (
+                    <span style={{ color: r.kmL >= 25 ? "var(--ok)" : r.kmL >= 18 ? "var(--warn)" : "var(--bad)" }}>
+                      {num(r.kmL, 1)}
+                    </span>
+                  ) : (
+                    <span className="ink-3">—</span>
+                  )}
+                </td>
+                <td className="ink-2 nums px-2 py-2 text-[0.78rem] hidden sm:table-cell">
+                  {x.litros ? num(x.litros, 1) : "—"}
+                </td>
+                <td className="px-1 py-2 text-right">
+                  <button
+                    className="icon-btn shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => {
+                      if (window.confirm(`¿Borrar el viaje «${x.nombre}»?`)) onBorrar(x.id);
+                    }}
+                    aria-label={`Borrar ${x.nombre}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
