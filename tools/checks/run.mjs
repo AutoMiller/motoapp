@@ -265,6 +265,53 @@ test("Auditoría: odómetro no monotónico entre mantenimientos", () => {
   assert.ok(h.some((x) => x.codigo === "odo-no-monotonico"), JSON.stringify(h));
 });
 
+test("Auditoría: sin vehículo o sin datos no lanza ni inventa hallazgos", () => {
+  assert.ok(auditoria?.auditoria, "falta exportar auditoria() en src/lib/auditoria.ts");
+  // Sin vehículo cargado la regla es no evaluar nada.
+  assert.deepEqual(auditoria.auditoria(estadoBase({ vehiculo: null }), HOY), []);
+  // Con vehículo pero colecciones vacías tampoco hay nada que reportar.
+  assert.deepEqual(
+    auditoria.auditoria(estadoBase({ kmActual: 0, documentos: [], componentes: [], mantenimientos: [] }), HOY),
+    [],
+  );
+  // Y con el odómetro en cero un mantenimiento en cero no es un retroceso.
+  const base = estadoBase();
+  const st = estadoBase({
+    vehiculo: { ...base.vehiculo, kmActual: 0 },
+    mantenimientos: [{ id: "m1", vehiculoId: "v1", fecha: "2026-10-01", km: 0,
+      categoria: "aceite", titulo: "Aceite", tipo: "preventivo", costo: 0 }],
+  });
+  assert.deepEqual(auditoria.auditoria(st, HOY), []);
+});
+
+test("Auditoría: acumula varios hallazgos y solo usa severidades válidas", () => {
+  const st = estadoBase({
+    mantenimientos: [
+      { id: "m1", vehiculoId: "v1", fecha: "2026-10-01", km: 12000, categoria: "combustible",
+        titulo: "Tanqueo", tipo: "preventivo", costo: 50000,
+        tanqueo: { galones: 0, precioGalon: 16000, odometro: 12000, tanqueLleno: true } },
+    ],
+    documentos: [{ id: "d1", vehiculoId: "v1", tipo: "soat", nombre: "SOAT" }],
+    componentes: [{ id: "c1", vehiculoId: "v1", nombre: "Bujía", categoria: "bujia",
+      intervaloKm: 0, intervaloMeses: 0, vidaUtilKm: 0, costoEstimado: 0, ultimoKm: 0,
+      ultimaFecha: HOY, activo: true }],
+  });
+  const h = auditoria.auditoria(st, HOY);
+  const codigos = new Set(h.map((x) => x.codigo));
+  for (const esperado of ["km-retroceso", "tanqueo-incompleto", "doc-sin-fecha", "componente-sin-intervalo"]) {
+    assert.ok(codigos.has(esperado), `falta ${esperado} en ${JSON.stringify([...codigos])}`);
+  }
+  // Cada hallazgo debe poder pintarse en pantalla: severidad conocida y mensaje con texto.
+  const validas = ["alta", "media", "baja"];
+  for (const x of h) {
+    assert.ok(validas.includes(x.severidad), `severidad inválida: ${x.severidad}`);
+    assert.ok(typeof x.mensaje === "string" && x.mensaje.trim().length > 0, `mensaje vacío en ${x.codigo}`);
+  }
+  // El agrupado por severidad que usa la tarjeta cubre el total, sin sobrantes ni duplicados.
+  const agrupados = validas.reduce((n, sev) => n + h.filter((x) => x.severidad === sev).length, 0);
+  assert.equal(agrupados, h.length);
+});
+
 /* ------------------------------- runner --------------------------------- */
 let ok = 0;
 let fail = 0;
