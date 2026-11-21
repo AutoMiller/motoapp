@@ -6,6 +6,7 @@ import { CATEGORIAS } from "../data/catalogo";
 import { combustiblePorMes, costoPorKm, gastos, resumenCombustible, tanqueos, totalMes } from "../lib/calc";
 import { formatDate, isoDate, money, moneyShort, num } from "../lib/format";
 import { Chip, EmptyState, Segmented, Stat } from "../components/ui";
+import { Ayuda } from "../components/Ayuda";
 import { BarrasMensuales, Linea } from "../components/charts";
 import { Icono } from "../components/iconos";
 import { ModalMantenimiento, ModalTanqueo } from "../components/formularios";
@@ -60,13 +61,26 @@ export function Gastos() {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Este mes" value={moneyShort(mes)} hint={formatDate(isoDate(), "mes")} tono="brand" />
         <Stat label="Este año" value={moneyShort(anio)} hint={`${todos.length} registros`} />
-        <Stat label="Costo por km" value={money(porKm)} hint="todos los gastos registrados" />
-        <Stat
-          label="Rendimiento"
-          value={comb.promedioKmGal > 0 ? `${num(comb.promedioKmGal, 0)} km/gal` : "—"}
-          hint={comb.promedioKmGal > 0 ? `${num(comb.promedioKmL, 1)} km/l` : "registra 2 tanqueos llenos"}
-          tono="ok"
-        />
+        <div className="card-flat p-3.5">
+          <div className="flex items-center gap-1">
+            <span className="ink-2 text-[0.72rem] font-semibold uppercase tracking-wide">Costo por km</span>
+            <Ayuda texto="Suma de todos los gastos registrados dividida entre los km recorridos desde el primer registro." />
+          </div>
+          <div className="nums mt-1 text-lg font-bold" style={{ color: "var(--ink)" }}>{money(porKm)}</div>
+          <div className="ink-3 mt-0.5 text-xs">todos los gastos registrados</div>
+        </div>
+        <div className="card-flat p-3.5">
+          <div className="flex items-center gap-1">
+            <span className="ink-2 text-[0.72rem] font-semibold uppercase tracking-wide">Rendimiento</span>
+            <Ayuda texto="Promedio de los últimos 5 tanqueos donde se calculó km recorridos / litros entre dos tanques llenos consecutivos." />
+          </div>
+          <div className="nums mt-1 text-lg font-bold" style={{ color: "var(--ok)" }}>
+            {comb.promedioKmGal > 0 ? `${num(comb.promedioKmGal, 0)} km/gal` : "—"}
+          </div>
+          <div className="ink-3 mt-0.5 text-xs">
+            {comb.promedioKmGal > 0 ? `${num(comb.promedioKmL, 1)} km/l` : "registra 2 tanqueos llenos"}
+          </div>
+        </div>
       </div>
 
       <Segmented

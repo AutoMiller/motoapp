@@ -3,6 +3,7 @@ import { CircleAlert, CircleCheck, Info, ShieldCheck, TriangleAlert } from "luci
 import type { AppState } from "../types";
 import { auditoria, type Hallazgo, type SeveridadHallazgo } from "../lib/auditoria";
 import { Chip, type Tono } from "./ui";
+import { Ayuda } from "./Ayuda";
 
 /**
  * Nombres legibles para los códigos que devuelve auditoria().
@@ -102,7 +103,10 @@ export function Auditoria({
             {total === 0 ? <CircleCheck size={17} /> : <ShieldCheck size={17} />}
           </span>
           <div className="min-w-0">
-            <h2 className="ink text-[0.95rem] font-bold">Revisión de datos</h2>
+            <div className="flex items-center gap-1">
+              <h2 className="ink text-[0.95rem] font-bold">Revisión de datos</h2>
+              <Ayuda texto="Alta: datos que pueden causar multas o errores graves. Media: inconsistencias que conviene corregir. Baja: observaciones menores sin impacto." titulo="Severidad" />
+            </div>
             <p className="ink-2 mt-0.5 text-[0.72rem] leading-snug">{subtitulo}</p>
           </div>
         </div>

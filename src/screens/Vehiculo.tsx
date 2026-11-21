@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import type { CategoriaMantenimiento, Documento, TipoDocumento } from "../types";
 import { useApp } from "../store/AppStore";
 import { Modal, Ring, SectionTitle } from "../components/ui";
+import { Ayuda } from "../components/Ayuda";
 import { Icono } from "../components/iconos";
 import { desgastes, documentosConVencimiento } from "../lib/calc";
 import { formatDate, formatFechaCorta, num } from "../lib/format";
@@ -182,9 +183,12 @@ export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMan
           title="Indicadores de desgaste"
           hint="Vida útil restante según km y tiempo"
           action={
-            <button className="ink-2 text-xs font-semibold" onClick={() => setVerTodosInd((x) => !x)}>
-              {verTodosInd ? "Ver menos" : "Ver todos"}
-            </button>
+            <span className="flex items-center gap-2">
+              <Ayuda texto="Se toma el menor entre % km recorridos vs intervalo y % tiempo transcurrido vs intervalo en meses. El primero en agotarse define el estado." titulo="Desgaste" />
+              <button className="ink-2 text-xs font-semibold" onClick={() => setVerTodosInd((x) => !x)}>
+                {verTodosInd ? "Ver menos" : "Ver todos"}
+              </button>
+            </span>
           }
         />
         <div className="card divide-y divide-[var(--line)]">
