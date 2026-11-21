@@ -14,6 +14,7 @@ import { Reportes } from "./screens/Reportes";
 import { PicoPlaca } from "./screens/PicoPlaca";
 import { Talleres } from "./screens/Talleres";
 import { Viajes } from "./screens/Viajes";
+import { Electrico } from "./screens/Electrico";
 import { Ajustes, ZonaMoto } from "./screens/Ajustes";
 import { Sheet } from "./components/Sheet";
 import { ModalMantenimiento, ModalTanqueo, ModalVehiculo } from "./components/formularios";
@@ -66,6 +67,7 @@ const TITULOS: Record<Seccion, { titulo: string; sub: string }> = {
   viajes: { titulo: "Viajes", sub: "Rutas, kilómetros y rendimiento por recorrido" },
   ajustes: { titulo: "Ajustes", sub: "Perfil, datos y reglas" },
   gastos: { titulo: "Gastos y tanqueos", sub: "Combustible y rendimiento" },
+  fusibles: { titulo: "Sistema eléctrico", sub: "Mapa de fusibles y diagnóstico" },
 };
 
 function Contenido() {
@@ -190,6 +192,7 @@ function Contenido() {
         )}
         {seccion === "reportes" && <Reportes />}
         {seccion === "gastos" && <Gastos />}
+        {seccion === "fusibles" && <Electrico />}
         {seccion === "pico" && <PicoPlaca />}
         {seccion === "talleres" && <Talleres />}
         {seccion === "viajes" && <Viajes />}
@@ -234,6 +237,7 @@ const MENU: { id: Seccion; label: string; icono: string }[] = [
   { id: "reportes", label: "Reportes", icono: "Landmark" },
   { id: "alertas", label: "Alertas", icono: "ShieldCheck" },
   { id: "pico", label: "Pico y placa", icono: "MapPin" },
+  { id: "fusibles", label: "Fusibles", icono: "Zap" },
   { id: "talleres", label: "Talleres", icono: "Store" },
   { id: "ajustes", label: "Ajustes", icono: "CircleDot" },
 ];

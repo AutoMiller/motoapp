@@ -160,8 +160,19 @@ function DetalleFusible({ f }: { f: Fusible }) {
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
-export function MapaFusibles() {
-  const [variante, setVariante] = useState<VarianteFusibles>("abs");
+export function MapaFusibles({
+  variante: varianteProp,
+  onVariante,
+}: {
+  variante?: VarianteFusibles;
+  onVariante?: (v: VarianteFusibles) => void;
+} = {}) {
+  const [varianteLocal, setVarianteLocal] = useState<VarianteFusibles>("abs");
+  const variante = varianteProp ?? varianteLocal;
+  const setVariante = (v: VarianteFusibles) => {
+    setVarianteLocal(v);
+    onVariante?.(v);
+  };
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const caja = CAJAS[variante];
@@ -188,7 +199,7 @@ export function MapaFusibles() {
   return (
     <div className="flex flex-col gap-4">
       {/* Variant selector */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(["abs", "carburada"] as VarianteFusibles[]).map((v) => {
           const active = v === variante;
           return (
@@ -206,7 +217,7 @@ export function MapaFusibles() {
                 color: active ? "#fff" : "var(--ink-2)",
               }}
             >
-              {CAJAS[v].etiqueta}
+              {v === "abs" ? "ABS (2019+)" : "Carburada"}
             </button>
           );
         })}
