@@ -16,10 +16,46 @@ import { Chip, Field, Modal, SectionTitle, Segmented } from "../components/ui";
 import { ModalPicoConfig, ModalVehiculo } from "../components/formularios";
 import { CIUDADES } from "../lib/picoPlaca";
 import { descargar } from "../lib/archivos";
-import { isoDate, money, num } from "../lib/format";
+import { formatDate, isoDate, money, num } from "../lib/format";
 import { COMPARENDOS, RTM_BOGOTA_2026, soatPorCilindraje } from "../lib/legal";
 import { URL_EDITOR, URL_HOJA } from "../lib/entorno";
-import type { PuntoEvento } from "../types";
+import type { AppState, PuntoEvento } from "../types";
+
+/** Valida que un JSON parseado tenga la estructura mínima de un respaldo MotoApp. */
+function validarRespaldo(data: unknown): string | null {
+  if (!data || typeof data !== "object") return "El archivo no contiene un objeto JSON válido.";
+  const obj = data as Record<string, unknown>;
+  if (!obj.ajustes || typeof obj.ajustes !== "object") return 'Falta el campo "ajustes" en el respaldo.';
+  if (obj.vehiculo !== undefined && obj.vehiculo !== null && typeof obj.vehiculo !== "object") return 'El campo "vehiculo" no es válido.';
+  const arraysKnown = ["mantenimientos", "documentos", "componentes", "alertas", "talleres", "ordenes", "puntos", "tareas", "viajes", "recursos"];
+  for (const key of arraysKnown) {
+    if (obj[key] !== undefined && !Array.isArray(obj[key])) {
+      return `El campo "${key}" debe ser un array.`;
+    }
+  }
+  return null;
+}
+
+/** Extrae un resumen del respaldo para mostrarlo antes de importar. */
+function resumenRespaldo(data: AppState) {
+  const mant = Array.isArray(data.mantenimientos) ? data.mantenimientos.length : 0;
+  const tanq = Array.isArray(data.mantenimientos)
+    ? data.mantenimientos.filter((m: any) => m.tanqueo).length
+    : 0;
+  const viaj = Array.isArray(data.viajes) ? data.viajes.length : 0;
+  // Buscar la fecha más reciente como referencia del respaldo (YYYY-MM-DD se compara léxicamente)
+  const fechas: string[] = [];
+  if (Array.isArray(data.mantenimientos)) {
+    for (const m of data.mantenimientos) {
+      if (m.fecha) fechas.push(m.fecha);
+    }
+  }
+  const fechaRef: string =
+    fechas.length
+      ? [...fechas].sort().at(-1)!
+      : data.vehiculo?.creado ?? "desconocida";
+  return { mantenimientos: mant, tanqueos: tanq, viajes: viaj, fecha: fechaRef };
+}
 
 export function Ajustes() {
   const { state, guardarAjustes, exportar, importar, reiniciar, cargarDemo, cargado, capacidades } = useApp();
@@ -28,6 +64,8 @@ export function Ajustes() {
   const [msg, setMsg] = useState("");
   const [pico, setPico] = useState(false);
   const [vehiculo, setVehiculo] = useState(false);
+  // Estado para el diálogo de confirmación de importación
+  const [importModal, setImportModal] = useState<{ mantenimientos: number; tanqueos: number; viajes: number; fecha: string; json: string } | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -172,7 +210,28 @@ export function Ajustes() {
                 const f = e.target.files?.[0];
                 if (!f) return;
                 const txt = await f.text();
-                setMsg(importar(txt) ? "Respaldo importado." : "Ese archivo no es un respaldo válido.");
+                // Paso 1: parsear y validar el JSON
+                let data: unknown;
+                try {
+                  data = JSON.parse(txt);
+                } catch {
+                  setMsg("El archivo no es un JSON válido.");
+                  e.target.value = "";
+                  return;
+                }
+                const error = validarRespaldo(data);
+                if (error) {
+                  setMsg(error);
+                  e.target.value = "";
+                  return;
+                }
+                // Paso 2: exportar automáticamente el estado actual como respaldo de seguridad
+                const backupJson = exportar();
+                descargar(`respaldo-antes-de-importar-${isoDate()}.json`, backupJson, "application/json");
+                // Paso 3: mostrar resumen y pedir confirmación
+                const res = resumenRespaldo(data as AppState);
+                setImportModal({ ...res, json: txt });
+                e.target.value = "";
               }}
             />
           </label>
@@ -328,6 +387,62 @@ export function Ajustes() {
           Se eliminarán la moto, el plan de mantenimiento, los documentos, el historial y los puntos. Exporta un
           respaldo antes si quieres conservarlos.
         </p>
+      </Modal>
+
+      {/* Confirmación de importación de respaldo */}
+      <Modal
+        open={importModal !== null}
+        onClose={() => setImportModal(null)}
+        title="Importar respaldo"
+        footer={
+          <div className="flex gap-2">
+            <button className="btn btn-ghost flex-1" onClick={() => setImportModal(null)}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary flex-1"
+              onClick={() => {
+                if (!importModal) return;
+                // El respaldo de seguridad ya se descargó antes de abrir este modal
+                const ok = importar(importModal.json);
+                setImportModal(null);
+                setMsg(ok ? "Respaldo importado. Se descargó un respaldo de seguridad." : "No se pudo importar el respaldo.");
+              }}
+            >
+              Sí, importar
+            </button>
+          </div>
+        }
+      >
+        {importModal && (
+          <div className="flex flex-col gap-3">
+            <p className="ink-2 text-sm leading-relaxed">
+              Este respaldo reemplazará todos los datos actuales. Se ha descargado automáticamente un respaldo de
+              seguridad con tu estado actual.
+            </p>
+            <div className="rounded-xl border border-[var(--line)] p-3" style={{ background: "var(--surface-2)" }}>
+              <p className="ink mb-2 text-[0.82rem] font-bold">Resumen del respaldo a importar</p>
+              <div className="grid grid-cols-2 gap-2 text-[0.78rem]">
+                <div>
+                  <span className="ink-3 block text-[0.68rem]">Mantenimientos</span>
+                  <span className="nums ink font-bold">{num(importModal.mantenimientos)}</span>
+                </div>
+                <div>
+                  <span className="ink-3 block text-[0.68rem]">Tanqueos</span>
+                  <span className="nums ink font-bold">{num(importModal.tanqueos)}</span>
+                </div>
+                <div>
+                  <span className="ink-3 block text-[0.68rem]">Viajes</span>
+                  <span className="nums ink font-bold">{num(importModal.viajes)}</span>
+                </div>
+                <div>
+                  <span className="ink-3 block text-[0.68rem]">Fecha del respaldo</span>
+                  <span className="nums ink font-bold">{importModal.fecha !== "desconocida" ? formatDate(importModal.fecha) : importModal.fecha}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -158,8 +158,11 @@ export function ModalMantenimiento({
             <button
               className="btn btn-danger"
               onClick={() => {
-                borrarMantenimiento(inicial.id);
-                onClose();
+                const que = inicial.tanqueo ? `tanqueo de ${inicial.km} km` : `servicio «${inicial.titulo}»`;
+                if (window.confirm(`¿Borrar el ${que}?`)) {
+                  borrarMantenimiento(inicial.id);
+                  onClose();
+                }
               }}
               aria-label="Eliminar registro"
             >

@@ -152,7 +152,13 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
         if (r.ok) tokenRef.current = r.token;
         else mostrarAviso("No se pudo guardar el cambio.", "error");
       } catch (e) {
-        mostrarAviso(`Error al guardar: ${(e as Error).message}`, "error");
+        const msg = (e as Error).message;
+        // Errores de almacenamiento lleno: aviso persistente (no se auto-cierra)
+        if ((e as Error).name === "StorageFullError") {
+          setAviso({ texto: msg, tono: "error" });
+        } else {
+          mostrarAviso(`Error al guardar: ${msg}`, "error");
+        }
       } finally {
         guardandoRef.current = Math.max(0, guardandoRef.current - 1);
         setGuardando(guardandoRef.current);
