@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Zap } from "lucide-react";
 import { CAJAS, type VarianteFusibles } from "../data/fusibles";
 import { MapaFusibles } from "../components/MapaFusibles";
+import { DiagnosticoElectrico } from "../components/DiagnosticoElectrico";
 
 export function Electrico() {
   const [variante, setVariante] = useState<VarianteFusibles>("abs");
@@ -34,6 +35,9 @@ export function Electrico() {
 
       {/* Mapa interactivo (con el selector de variante) */}
       <MapaFusibles variante={variante} onVariante={setVariante} />
+
+      {/* Diagnóstico por síntoma */}
+      <DiagnosticoElectrico />
 
       {/* Advertencias */}
       <div className="card p-4">
