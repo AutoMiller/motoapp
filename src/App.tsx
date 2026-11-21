@@ -13,6 +13,7 @@ import { Gastos } from "./screens/Gastos";
 import { Reportes } from "./screens/Reportes";
 import { PicoPlaca } from "./screens/PicoPlaca";
 import { Talleres } from "./screens/Talleres";
+import { Viajes } from "./screens/Viajes";
 import { Ajustes, ZonaMoto } from "./screens/Ajustes";
 import { Sheet } from "./components/Sheet";
 import { ModalMantenimiento, ModalTanqueo, ModalVehiculo } from "./components/formularios";
@@ -62,6 +63,7 @@ const TITULOS: Record<Seccion, { titulo: string; sub: string }> = {
   reportes: { titulo: "Reportes", sub: "Costos, combustible e historial vehicular" },
   pico: { titulo: "Pico y placa", sub: "Reglas por ciudad y festivos" },
   talleres: { titulo: "Talleres", sub: "Red de confianza y órdenes" },
+  viajes: { titulo: "Viajes", sub: "Rutas, kilómetros y rendimiento por recorrido" },
   ajustes: { titulo: "Ajustes", sub: "Perfil, datos y reglas" },
   gastos: { titulo: "Gastos y tanqueos", sub: "Combustible y rendimiento" },
 };
@@ -190,6 +192,7 @@ function Contenido() {
         {seccion === "gastos" && <Gastos />}
         {seccion === "pico" && <PicoPlaca />}
         {seccion === "talleres" && <Talleres />}
+        {seccion === "viajes" && <Viajes />}
         {seccion === "ajustes" && <Ajustes />}
       </Sheet>
 
@@ -227,6 +230,7 @@ const MENU: { id: Seccion; label: string; icono: string }[] = [
   { id: "documentos", label: "Hoja de vida", icono: "Bike" },
   { id: "historial", label: "Mantenimientos", icono: "Wrench" },
   { id: "gastos", label: "Gastos y tanqueos", icono: "Fuel" },
+  { id: "viajes", label: "Viajes", icono: "Route" },
   { id: "reportes", label: "Reportes", icono: "Landmark" },
   { id: "alertas", label: "Alertas", icono: "ShieldCheck" },
   { id: "pico", label: "Pico y placa", icono: "MapPin" },

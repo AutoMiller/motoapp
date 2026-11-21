@@ -57,6 +57,7 @@ export type Seccion =
   | "pico"
   | "talleres"
   | "ajustes"
+  | "viajes"
   | "gastos";
 
 /** Posiciones en % calculadas sobre el viewBox del SVG (15 45 375 140). */

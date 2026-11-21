@@ -158,6 +158,20 @@ export interface Tarea {
   orden: number;
 }
 
+/** Salida con nombre: sirve para comparar el rendimiento de la misma ruta. */
+export interface Viaje {
+  id: ID;
+  vehiculoId: ID;
+  nombre: string; // p. ej. "Villavicencio → Restrepo"
+  fecha: string; // YYYY-MM-DD
+  kmInicio: number;
+  kmFin: number;
+  litros?: number;
+  costo?: number;
+  ida_y_vuelta?: boolean;
+  notas?: string;
+}
+
 export interface PuntoEvento {
   id: ID;
   fecha: string;
@@ -200,6 +214,7 @@ export interface AppState {
   ordenes: OrdenServicio[];
   puntos: PuntoEvento[];
   tareas: Tarea[];
+  viajes: Viaje[];
   ajustes: Ajustes;
   onboardingCompleto: boolean;
   esDemo?: boolean;

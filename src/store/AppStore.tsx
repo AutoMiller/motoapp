@@ -12,6 +12,7 @@ import type {
   Taller,
   Tarea,
   Vehiculo,
+  Viaje,
 } from "../types";
 import { estadoInicial, estadoDemo, migrar, type DatosOnboarding } from "../data/seed";
 import { crearBackend, type Backend, type Capacidades } from "./backend";
@@ -51,6 +52,8 @@ interface Ctx {
   borrarTarea: (id: ID) => void;
   guardarRecurso: (r: Recurso) => void;
   borrarRecurso: (id: ID) => void;
+  guardarViaje: (v: Viaje) => void;
+  borrarViaje: (id: ID) => void;
   inicializarTareas: (lista: Tarea[]) => void;
   reiniciarTareas: (lista: Tarea[]) => void;
   guardarAjustes: (patch: Partial<Ajustes>) => void;
@@ -278,6 +281,8 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
       borrarTarea: (id) => mutarSeguro("tarea:borrar", id),
       guardarRecurso: (r) => mutarSeguro("recurso:guardar", r),
       borrarRecurso: (id) => mutarSeguro("recurso:borrar", id),
+      guardarViaje: (v) => mutarSeguro("viaje:guardar", v),
+      borrarViaje: (id) => mutarSeguro("viaje:borrar", id),
       inicializarTareas: (lista) => mutarSeguro("tareas:inicializar", lista),
       reiniciarTareas: (lista) => mutarSeguro("tareas:reiniciar", lista),
       guardarAjustes: (patch) => mutarSeguro("ajustes", patch),
