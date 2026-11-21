@@ -45,6 +45,7 @@ import { CAPACIDAD_TANQUE_L, CONSUMO_REF_KML, SUBSISTEMAS, TAREAS_SEED } from ".
 import { BarrasMensuales } from "../components/charts";
 import { Chip, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
+import { Radar } from "../components/Radar";
 
 export type Seccion =
   | "menu"
@@ -290,6 +291,9 @@ export function Dashboard({
           </button>
         </div>
       </div>
+
+      {/* ---------------- Radar de problemas ---------------- */}
+      <Radar ir={(s) => onAbrir(s)} />
 
       {/* ---------------- HUD ---------------- */}
       <div className="hud p-4 sm:p-5">

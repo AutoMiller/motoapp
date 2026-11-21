@@ -30,11 +30,37 @@ function b64urlEncode(bytes: Uint8Array): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** Tope de seguridad: nada de descomprimir un enlace a lo loco (zip-bomb). */
+const MAX_URL_CHARS = 200_000;      // ~150 KB de datos ya codificados
+const MAX_JSON_BYTES = 4 * 1024 * 1024; // 4 MB de JSON descomprimido
+
 async function inflar(bytes: Uint8Array): Promise<Uint8Array> {
   const ds = new DecompressionStream("deflate-raw");
   const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(ds);
-  const buf = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buf);
+  const lector = stream.getReader();
+  const trozos: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await lector.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_JSON_BYTES) {
+        await lector.cancel();
+        throw new Error("Enlace demasiado grande");
+      }
+      trozos.push(value);
+    }
+  } finally {
+    lector.releaseLock();
+  }
+  const out = new Uint8Array(total);
+  let pos = 0;
+  for (const t of trozos) {
+    out.set(t, pos);
+    pos += t.byteLength;
+  }
+  return out;
 }
 
 async function desinflar(bytes: Uint8Array): Promise<Uint8Array> {
@@ -49,10 +75,15 @@ export async function leerEstadoDeLaUrl(hash: string = window.location.hash): Pr
   const limpio = hash.replace(/^#\/?/, "");
   const m = /^(?:dato|d)=([A-Za-z0-9_-]+)/.exec(limpio);
   if (!m) return null;
+  if (m[1].length > MAX_URL_CHARS) throw new Error("Enlace demasiado grande");
   const bytes = b64urlDecode(m[1]);
   const plano = await inflar(bytes);
   const json = JSON.parse(new TextDecoder().decode(plano)) as AppState & { _etiqueta?: string };
-  const { _etiqueta, ...estado } = json as AppState & { _etiqueta?: string };
+  // Validación mínima antes de entregarlo al store
+  if (!json || typeof json !== "object" || Array.isArray(json) || !("ajustes" in json)) {
+    throw new Error("El enlace no contiene un estado válido de MotoApp");
+  }
+  const { _etiqueta, ...estado } = json;
   return { estado: estado as AppState, etiqueta: _etiqueta };
 }
 
