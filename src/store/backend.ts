@@ -1,6 +1,7 @@
 import type { AppState } from "../types";
 import { cargarEstado, escribirEstado } from "./storage";
 import { estadoInicial, migrar } from "../data/seed";
+import { leerEstadoDeLaUrl } from "../lib/enlace";
 
 export interface Snapshot {
   estado: AppState;
@@ -17,6 +18,8 @@ export interface Capacidades {
   fotos: boolean;
   backend: "local" | "gas";
   importar: boolean;
+  /** true = vista de solo lectura con datos traídos por el enlace */
+  soloLectura?: boolean;
 }
 
 export interface Backend {
@@ -30,6 +33,33 @@ export function huella(texto: string): string {
   let h = 5381;
   for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) | 0;
   return `${(h >>> 0).toString(36)}-${texto.length.toString(36)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Backend de solo lectura: estado traído por el enlace (#dato=)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Sirve datos que vienen en la URL y **nunca guarda**: `guardar()` siempre
+ * responde `ok: false`, así que el IndexedDB del visitante queda intacto.
+ */
+export class BackendSnapshot implements Backend {
+  capacidades: Capacidades = { fotos: false, backend: "local", importar: false, soloLectura: true };
+  private snapshot: AppState;
+  private token: string;
+
+  constructor(snapshot: AppState) {
+    this.snapshot = snapshot;
+    this.token = huella(JSON.stringify(snapshot));
+  }
+
+  async cargar(): Promise<Snapshot> {
+    return { estado: this.snapshot, token: this.token };
+  }
+
+  async guardar(): Promise<ResultadoGuardado> {
+    return { ok: false, token: this.token };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -126,4 +156,20 @@ export class BackendGas implements Backend {
 
 export function crearBackend(): Backend {
   return esAppsScript() ? new BackendGas() : new BackendLocal();
+}
+
+/**
+ * Elige el backend al arrancar. Si la URL trae `#dato=`, el modo es **solo
+ * lectura** con esos datos: nunca se escribe en el navegador del visitante.
+ */
+export async function crearBackendInicial(): Promise<{ backend: Backend; etiqueta?: string }> {
+  try {
+    const enlace = await leerEstadoDeLaUrl();
+    if (enlace) {
+      return { backend: new BackendSnapshot(migrar(enlace.estado)), etiqueta: enlace.etiqueta };
+    }
+  } catch {
+    /* enlace corrupto: se cae al backend normal en vez de romper la app */
+  }
+  return { backend: crearBackend() };
 }

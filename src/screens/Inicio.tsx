@@ -33,7 +33,8 @@ export function Inicio({
   onEditarKm: () => void;
   onPuntos: () => void;
 }) {
-  const { state } = useApp();
+  const { state, capacidades } = useApp();
+  const soloLectura = capacidades.soloLectura === true;
   const v = state.vehiculo;
   if (!v) return null;
 
@@ -81,13 +82,23 @@ export function Inicio({
         </button>
       </div>
 
-      {state.esDemo && (
-        <div className="flex items-start gap-2 rounded-2xl px-3.5 py-2.5" style={{ background: "var(--warn-soft)" }}>
-          <Sparkles size={14} className="mt-0.5 shrink-0" style={{ color: "var(--warn)" }} />
-          <p className="text-[0.72rem] leading-relaxed" style={{ color: "var(--warn)" }}>
-            Estás viendo datos de ejemplo. En Ajustes puedes borrarlos y empezar con los datos reales de tu moto.
+      {soloLectura ? (
+        <div className="flex items-start gap-2 rounded-2xl px-3.5 py-2.5" style={{ background: "var(--brand-soft)" }}>
+          <Sparkles size={14} className="mt-0.5 shrink-0" style={{ color: "var(--brand)" }} />
+          <p className="text-[0.72rem] leading-relaxed" style={{ color: "var(--brand)" }}>
+            Vista de solo lectura: estos datos vienen dentro del enlace y no se guardan en tu navegador.
+            Nada de lo que hagas aquí cambia la hoja de la moto.
           </p>
         </div>
+      ) : (
+        state.esDemo && (
+          <div className="flex items-start gap-2 rounded-2xl px-3.5 py-2.5" style={{ background: "var(--warn-soft)" }}>
+            <Sparkles size={14} className="mt-0.5 shrink-0" style={{ color: "var(--warn)" }} />
+            <p className="text-[0.72rem] leading-relaxed" style={{ color: "var(--warn)" }}>
+              Estás viendo datos de ejemplo. En Ajustes puedes borrarlos y empezar con los datos reales de tu moto.
+            </p>
+          </div>
+        )
       )}
 
       {/* Avisos del día */}

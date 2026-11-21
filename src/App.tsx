@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bike, ExternalLink, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { URL_EDITOR, URL_HOJA } from "./lib/entorno";
 import { AppProvider, useApp } from "./store/AppStore";
+import { crearBackendInicial, type Backend } from "./store/backend";
 import type { CategoriaMantenimiento } from "./types";
 import { Onboarding } from "./screens/Onboarding";
 import { Dashboard, type Seccion } from "./screens/Dashboard";
@@ -18,8 +19,35 @@ import { ModalMantenimiento, ModalTanqueo, ModalVehiculo } from "./components/fo
 import { Icono } from "./components/iconos";
 
 export default function App() {
+  const [backend, setBackend] = useState<{ backend: Backend; etiqueta?: string } | null>(null);
+  const [fallo, setFallo] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    crearBackendInicial()
+      .then((b) => vivo && setBackend(b))
+      .catch(() => vivo && setFallo(true));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  if (fallo) {
+    return (
+      <AppProvider>
+        <Contenido />
+      </AppProvider>
+    );
+  }
+  if (!backend) {
+    return (
+      <div className="grid min-h-dvh place-items-center" style={{ background: "var(--bg)" }}>
+        <Loader2 className="animate-spin" size={22} style={{ color: "var(--ink-2)" }} />
+      </div>
+    );
+  }
   return (
-    <AppProvider>
+    <AppProvider backendInicial={backend.backend} etiqueta={backend.etiqueta}>
       <Contenido />
     </AppProvider>
   );

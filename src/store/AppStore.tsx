@@ -69,9 +69,15 @@ const AppCtx = createContext<Ctx | null>(null);
 
 const INTERVALO_SYNC_MS = 15_000;
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({ children, backendInicial, etiqueta }: {
+  children: React.ReactNode;
+  backendInicial?: Backend;
+  /** Texto del enlace (p. ej. "snapshot 2026-11-21"); hoy solo documenta el origen. */
+  etiqueta?: string;
+}) {
+  void etiqueta;
   const backendRef = useRef<Backend | null>(null);
-  if (!backendRef.current) backendRef.current = crearBackend();
+  if (!backendRef.current) backendRef.current = backendInicial ?? crearBackend();
   const backend = backendRef.current;
 
   const [state, setState] = useState<AppState>(estadoInicial);
@@ -161,6 +167,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [persistir],
   );
 
+  /* ---------------- Modo solo lectura (datos traídos por el enlace) ---------------- */
+  const soloLectura = backend.capacidades.soloLectura === true;
+  const mutarSeguro = useCallback(
+    (accion: string, datos?: unknown) => {
+      if (soloLectura) {
+        mostrarAviso("Vista de solo lectura: este enlace no guarda cambios.", "info");
+        return;
+      }
+      mutar(accion, datos);
+    },
+    [soloLectura, mutar, mostrarAviso],
+  );
+
   /* ---------------- Sincronización con la hoja ---------------- */
   useEffect(() => {
     if (!cargado || backend.capacidades.backend !== "gas") return;
@@ -238,34 +257,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       },
       limpiarAviso: () => setAviso(null),
-      guardarVehiculo: (patch) => mutar("vehiculo", patch),
-      registrarMantenimiento: (m) => mutar("mantenimiento:crear", m),
-      actualizarMantenimiento: (id, patch) => mutar("mantenimiento:actualizar", { id, patch }),
-      borrarMantenimiento: (id) => mutar("mantenimiento:borrar", id),
-      guardarDocumento: (d) => mutar("documento:guardar", d),
-      borrarDocumento: (id) => mutar("documento:borrar", id),
-      guardarComponente: (c) => mutar("componente:guardar", c),
-      borrarComponente: (id) => mutar("componente:borrar", id),
-      guardarAlerta: (a) => mutar("alerta:guardar", a),
-      borrarAlerta: (id) => mutar("alerta:borrar", id),
-      guardarTaller: (t) => mutar("taller:guardar", t),
-      borrarTaller: (id) => mutar("taller:borrar", id),
-      guardarOrden: (o) => mutar("orden:guardar", o),
-      borrarOrden: (id) => mutar("orden:borrar", id),
-      guardarTarea: (t) => mutar("tarea:guardar", t),
-      borrarTarea: (id) => mutar("tarea:borrar", id),
-      inicializarTareas: (lista) => mutar("tareas:inicializar", lista),
-      reiniciarTareas: (lista) => mutar("tareas:reiniciar", lista),
-      guardarAjustes: (patch) => mutar("ajustes", patch),
-      sumarPuntos: (motivo, puntos) => mutar("puntos", { motivo, puntos }),
-      completarOnboarding: (datos) => mutar("onboarding", datos),
-      cargarDemo: () => mutar("reemplazar", { ...estadoDemo(), esDemo: true }),
-      reiniciar: () => mutar("reiniciar"),
+      guardarVehiculo: (patch) => mutarSeguro("vehiculo", patch),
+      registrarMantenimiento: (m) => mutarSeguro("mantenimiento:crear", m),
+      actualizarMantenimiento: (id, patch) => mutarSeguro("mantenimiento:actualizar", { id, patch }),
+      borrarMantenimiento: (id) => mutarSeguro("mantenimiento:borrar", id),
+      guardarDocumento: (d) => mutarSeguro("documento:guardar", d),
+      borrarDocumento: (id) => mutarSeguro("documento:borrar", id),
+      guardarComponente: (c) => mutarSeguro("componente:guardar", c),
+      borrarComponente: (id) => mutarSeguro("componente:borrar", id),
+      guardarAlerta: (a) => mutarSeguro("alerta:guardar", a),
+      borrarAlerta: (id) => mutarSeguro("alerta:borrar", id),
+      guardarTaller: (t) => mutarSeguro("taller:guardar", t),
+      borrarTaller: (id) => mutarSeguro("taller:borrar", id),
+      guardarOrden: (o) => mutarSeguro("orden:guardar", o),
+      borrarOrden: (id) => mutarSeguro("orden:borrar", id),
+      guardarTarea: (t) => mutarSeguro("tarea:guardar", t),
+      borrarTarea: (id) => mutarSeguro("tarea:borrar", id),
+      inicializarTareas: (lista) => mutarSeguro("tareas:inicializar", lista),
+      reiniciarTareas: (lista) => mutarSeguro("tareas:reiniciar", lista),
+      guardarAjustes: (patch) => mutarSeguro("ajustes", patch),
+      sumarPuntos: (motivo, puntos) => mutarSeguro("puntos", { motivo, puntos }),
+      completarOnboarding: (datos) => mutarSeguro("onboarding", datos),
+      cargarDemo: () => mutarSeguro("reemplazar", { ...estadoDemo(), esDemo: true }),
+      reiniciar: () => mutarSeguro("reiniciar"),
       importar: (json: string) => {
         try {
           const data = JSON.parse(json) as AppState;
           if (!data || typeof data !== "object" || !("ajustes" in data)) return false;
-          mutar("reemplazar", data);
+          mutarSeguro("reemplazar", data);
           return true;
         } catch {
           return false;
@@ -274,7 +293,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       exportar: () => JSON.stringify(state, null, 2),
       totalPuntos: puntosTotales(state),
     }),
-    [state, cargado, backend, guardando, aviso, errorCarga, mutar, mostrarAviso],
+    [state, cargado, backend, guardando, aviso, errorCarga, mutarSeguro, mostrarAviso],
   );
 
   return <AppCtx.Provider value={valor}>{children}</AppCtx.Provider>;
