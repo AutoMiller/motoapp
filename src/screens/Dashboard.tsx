@@ -46,6 +46,7 @@ import { BarrasMensuales } from "../components/charts";
 import { Chip, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
 import { Radar } from "../components/Radar";
+import { Ayuda } from "../components/Ayuda";
 
 export type Seccion =
   | "menu"
@@ -319,7 +320,10 @@ export function Dashboard({
             <Ring value={salud / 100} size={58} stroke={5}>
               <span className="nums text-[0.8rem] font-extrabold text-white">{salud}%</span>
             </Ring>
-            <span className="mt-0.5 text-[0.56rem] font-bold uppercase tracking-widest text-slate-500">Salud</span>
+            <div className="mt-0.5 flex items-center gap-1">
+              <span className="text-[0.56rem] font-bold uppercase tracking-widest text-slate-500">Salud</span>
+              <Ayuda texto="Promedio de vida útil restante de todos los componentes (55%) + % documentos legales vigentes (45%)." />
+            </div>
           </div>
         </div>
 
@@ -395,7 +399,10 @@ export function Dashboard({
             </div>
 
             <div className="rounded-xl border border-orange-400/25 bg-orange-400/10 px-2.5 py-2">
-              <p className="text-[0.58rem] font-bold uppercase tracking-widest text-orange-300">Próximo hito</p>
+              <div className="flex items-center gap-1">
+                <p className="text-[0.58rem] font-bold uppercase tracking-widest text-orange-300">Próximo hito</p>
+                <Ayuda texto="Múltiplo de 5 000 km superior al kilometraje actual. Se usa como referencia para el gran servicio." />
+              </div>
               <p className="nums text-[0.9rem] font-extrabold text-white">
                 {num(hito)} km · faltan {num(faltanHito)}
               </p>
