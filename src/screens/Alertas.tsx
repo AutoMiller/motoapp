@@ -8,6 +8,7 @@ import { DOCUMENTOS_META } from "../data/catalogo";
 import { formatDate, isoDate, num } from "../lib/format";
 import { Icono } from "../components/iconos";
 import { ModalAlerta } from "../components/formularios";
+import { Auditoria } from "../components/Auditoria";
 import { CIUDADES, ciudadPorId, evaluarPicoPlaca, proximosDias } from "../lib/picoPlaca";
 import type { Ruta } from "../lib/router";
 
@@ -94,6 +95,9 @@ export function Alertas({ ir }: { ir: (r: Ruta) => void }) {
           })}
         </div>
       </div>
+
+      {/* Revisión de datos */}
+      <Auditoria state={state} />
 
       {/* Mantenimiento urgente */}
       {urgentes.length > 0 && (

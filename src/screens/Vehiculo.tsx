@@ -13,6 +13,7 @@ import { comprimirImagen } from "../lib/archivos";
 import { proximaRTM } from "../lib/legal";
 import { ModalComponente, ModalDocumento, ModalVehiculo } from "../components/formularios";
 import { Recursos } from "../components/Recursos";
+import { Auditoria } from "../components/Auditoria";
 
 export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMantenimiento) => void }) {
   const { state, capacidades, guardarVehiculo, borrarDocumento } = useApp();
@@ -211,6 +212,9 @@ export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMan
       </div>
 
       <Recursos />
+
+      {/* Revisión de datos: hallazgos de auditoria() sobre lo que hay cargado */}
+      <Auditoria state={state} />
 
       {/* Datos legales rápidos */}
       <div className="card p-4">
