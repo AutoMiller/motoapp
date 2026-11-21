@@ -261,6 +261,25 @@ Cada push a `main` compila con Vite y publica `dist/` mediante
 `npm run build` genera `dist/` con rutas relativas: sirve igual en Netlify,
 Cloudflare Pages, un bucket S3 o un `python -m http.server`.
 
+### PWA instalable y sin conexión
+
+El build web incluye `public/manifest.webmanifest` y `public/sw.js`: se puede
+instalar desde el navegador ("Añadir a pantalla de inicio") y abre completa sin
+red después de la primera visita. El service worker es manual, sin
+dependencias de build:
+
+- **Instalación**: precarga el cascarón (`./`, `index.html`), el manifest y los
+  iconos; después lee los `<script>`/`<link>` del index y cachea los assets con
+  hash, que no se conocen hasta compilar.
+- **Navegación**: *network-first* con 4 s de margen y respaldo al index cacheado,
+  para que online siempre veas la versión nueva.
+- **Assets del mismo origen**: *cache-first* con revalidación en segundo plano.
+- **Otro origen** (Apps Script) nunca se cachea: los datos viven en IndexedDB.
+
+Para invalidar cachés tras cambiar el cascarón, sube `VERSION` en `public/sw.js`.
+Los iconos se regeneran con `python3 tools/iconos.py` (requiere Pillow).
+En el build de Apps Script (`--mode gas`) el registro del SW se elimina solo.
+
 ### Google Apps Script
 
 Ver [`docs/gas.md`](docs/gas.md).
