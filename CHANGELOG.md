@@ -4,6 +4,16 @@ Todos los cambios notables de este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Añadido
+
+- PWA instalable: `manifest.webmanifest` (nombre, iconos 192/512 y maskable,
+  `display: standalone`) e iconos PNG generados con `tools/iconos.py`.
+- Service worker propio (`public/sw.js`): precarga del cascarón y de los assets
+  con hash, *network-first* para navegación y *cache-first* con revalidación
+  para assets. Registro solo en el build web de producción.
+
 ## [1.0.0] — 2026-10-31
 
 Primera versión pública.
