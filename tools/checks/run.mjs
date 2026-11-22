@@ -409,6 +409,76 @@ test("Auditoría: acumula varios hallazgos y solo usa severidades válidas", () 
   assert.equal(agrupados, h.length);
 });
 
+/* -------------------------- catálogo de piezas -------------------------- */
+const partesOut = mkdtempSync(join(tmpdir(), "motoapp-partes-"));
+
+async function loadPartes() {
+  const file = join(partesOut, "partes.mjs");
+  execFileSync(
+    esbuild,
+    [
+      join(root, "src/data/partes.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${file}`,
+      "--log-level=error",
+    ],
+    { stdio: "inherit" },
+  );
+  return import(pathToFileURL(file).href);
+}
+
+const partes = await loadPartes();
+
+test("Piezas: toda pieza tiene al menos 1 placement", () => {
+  for (const p of partes.CATALOGO_PIEZAS) {
+    assert.ok(
+      p.placements.length >= 1,
+      `${p.partId} no tiene placements`,
+    );
+  }
+});
+
+test("Piezas: matchIds y matchKeywords no vacíos", () => {
+  for (const p of partes.CATALOGO_PIEZAS) {
+    assert.ok(
+      p.matchIds.length >= 1,
+      `${p.partId} tiene matchIds vacío`,
+    );
+    assert.ok(
+      p.matchKeywords.length >= 1,
+      `${p.partId} tiene matchKeywords vacío`,
+    );
+  }
+});
+
+test("Piezas: piezasDeAngulo('left') devuelve más de 8", () => {
+  const left = partes.piezasDeAngulo("left");
+  assert.ok(
+    left.length > 8,
+    `piezasDeAngulo('left')=${left.length} (esperado > 8)`,
+  );
+});
+
+test("Piezas: buscarPiezaDeComponente('Cambio de aceite','aceite') devuelve aceite-motor", () => {
+  const r = partes.buscarPiezaDeComponente("Cambio de aceite", "aceite");
+  assert.equal(
+    r?.partId,
+    "aceite-motor",
+    `devolvió ${r?.partId ?? null}`,
+  );
+});
+
+test("Piezas: buscarPiezaDeComponente('Cadena','cadena') devuelve la pieza de cadena", () => {
+  const r = partes.buscarPiezaDeComponente("Cadena", "cadena");
+  assert.equal(
+    r?.partId,
+    "cadena",
+    `devolvió ${r?.partId ?? null}`,
+  );
+});
+
 /* ------------------------------- runner --------------------------------- */
 let ok = 0;
 let fail = 0;
@@ -423,5 +493,6 @@ for (const p of pruebas) {
   }
 }
 rmSync(out, { recursive: true, force: true });
+rmSync(partesOut, { recursive: true, force: true });
 console.log(`\n${ok} ok, ${fail} fallidos, ${pruebas.length} chequeos`);
 process.exit(fail ? 1 : 0);
