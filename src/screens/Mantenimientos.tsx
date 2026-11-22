@@ -1,16 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Download, Filter, Plus, Wrench } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, Download, Plus, Search, Wrench, X } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import type { CategoriaMantenimiento, Mantenimiento } from "../types";
-import { CATEGORIAS, CATEGORIAS_LISTA } from "../data/catalogo";
+import { CATEGORIAS } from "../data/catalogo";
 import { desgastes, diasProyectados, gastos, ritmoKmDiario } from "../lib/calc";
 import { formatDate, isoDate, money, monthLabel, num } from "../lib/format";
+import { relativa, fechaExacta } from "../lib/fechas";
 import { Chip, EmptyState, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
 import { ModalComponente, ModalMantenimiento } from "../components/formularios";
 
 type TabMode = "cards" | "table";
 type SortDir = "asc" | "desc";
+type BitacoraFiltro = "todos" | "combustible" | "mantenimiento" | "repuestos";
+
+const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 /** Lee o escribe la preferencia de vista en localStorage. */
 function useVista(pantalla: string): [TabMode, (v: TabMode) => void] {
@@ -27,6 +31,43 @@ function useVista(pantalla: string): [TabMode, (v: TabMode) => void] {
     try { localStorage.setItem(key, v); } catch { /* noop */ }
   };
   return [vista, set];
+}
+
+/** Filtro de bitácora persistente en localStorage. */
+function useBitacoraFiltro(): [BitacoraFiltro, (v: BitacoraFiltro) => void] {
+  const key = "motoapp:bitacora:filtro";
+  const [valor, setValor] = useState<BitacoraFiltro>(() => {
+    try {
+      return (localStorage.getItem(key) as BitacoraFiltro) ?? "todos";
+    } catch {
+      return "todos";
+    }
+  });
+  const set = (v: BitacoraFiltro) => {
+    setValor(v);
+    try { localStorage.setItem(key, v); } catch { /* noop */ }
+  };
+  return [valor, set];
+}
+
+/** Clasifica un registro según el segmented control de bitácora. */
+function grupoBitacora(m: Mantenimiento): BitacoraFiltro {
+  if (m.tanqueo) return "combustible";
+  // Repuestos = categorías de arrastre, llantas, batería
+  if (m.categoria === "arrastre" || m.categoria === "llantas" || m.categoria === "bateria") return "repuestos";
+  return "mantenimiento";
+}
+
+/** Hook con debounce genérico. */
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer.current!);
+  }, [value, delay]);
+  return debounced;
 }
 
 /** Escapa un valor para CSV: comillas dobles internas y envuelve si hay separador/salto. */
@@ -75,35 +116,86 @@ export function Mantenimientos({
   const ds = useMemo(() => desgastes(state), [state]);
   const ritmo = useMemo(() => ritmoKmDiario(state), [state]);
 
-  // Historial
+  // Historial / Bitácora
   const todos = gastos(state);
 
-  const exportarCSV = useCallback(() => {
-    descargarCSV(todos, isoDate());
-  }, [todos]);
   const anios = useMemo(() => {
     const set = new Set(todos.map((m) => m.fecha.slice(0, 4)));
     set.add(isoDate().slice(0, 4));
     return [...set].sort().reverse();
   }, [todos]);
   const [anio, setAnio] = useState(anios[0]);
+
+  // Mes filter
+  const mesesDisponibles = useMemo(() => {
+    const set = new Set(todos.filter((m) => m.fecha.startsWith(anio)).map((m) => m.fecha.slice(0, 7)));
+    return [...set].sort().reverse();
+  }, [todos, anio]);
+  const [mes, setMes] = useState<string>("todos");
+
+  // Bitácora segmented filter (localStorage)
+  const [bitacoraFiltro, setBitacoraFiltro] = useBitacoraFiltro();
+
+  // Búsqueda con debounce
+  const [busquedaRaw, setBusquedaRaw] = useState("");
+  const busqueda = useDebounce(busquedaRaw, 150);
+
+  // Filtro por categoría (legacy chips)
   const [filtro, setFiltro] = useState<CategoriaMantenimiento | "todos">("todos");
   const [editando, setEditando] = useState<Mantenimiento | undefined>();
 
-  const registros = todos.filter(
-    (m) => m.fecha.startsWith(anio) && (filtro === "todos" || m.categoria === filtro),
-  );
-  const totalAnio = registros.reduce((a, m) => a + m.costo, 0);
+  // Aplicar filtros en cascada: año → mes → bitácora → categoría → búsqueda
+  const filtradosBitacora = useMemo(() => {
+    let r = todos.filter((m) => m.fecha.startsWith(anio));
+    if (mes !== "todos") r = r.filter((m) => m.fecha.startsWith(mes));
+    if (bitacoraFiltro !== "todos") r = r.filter((m) => grupoBitacora(m) === bitacoraFiltro);
+    if (filtro !== "todos") r = r.filter((m) => m.categoria === filtro);
+    if (busqueda.trim()) {
+      const q = busqueda.trim().toLowerCase();
+      r = r.filter(
+        (m) =>
+          m.titulo.toLowerCase().includes(q) ||
+          (m.taller ?? "").toLowerCase().includes(q) ||
+          (m.descripcion ?? "").toLowerCase().includes(q) ||
+          m.categoria.toLowerCase().includes(q),
+      );
+    }
+    return r;
+  }, [todos, anio, mes, bitacoraFiltro, filtro, busqueda]);
+
+  const exportarCSV = useCallback(() => {
+    descargarCSV(filtradosBitacora, isoDate());
+  }, [filtradosBitacora]);
+
+  const totalAnio = filtradosBitacora.reduce((a, m) => a + m.costo, 0);
   const agrupado = useMemo(() => {
     const map: { key: string; items: Mantenimiento[] }[] = [];
-    for (const m of registros) {
+    for (const m of filtradosBitacora) {
       const key = m.fecha.slice(0, 7);
       const ultimo = map[map.length - 1];
       if (ultimo && ultimo.key === key) ultimo.items.push(m);
       else map.push({ key, items: [m] });
     }
     return map;
-  }, [registros]);
+  }, [filtradosBitacora]);
+
+  // Limpiar todos los filtros de bitácora
+  const limpiarFiltros = useCallback(() => {
+    setBitacoraFiltro("todos");
+    setBusquedaRaw("");
+    setMes("todos");
+    setFiltro("todos");
+  }, [setBitacoraFiltro]);
+
+  // Texto vacío según filtros activos
+  const textoVacio = useMemo(() => {
+    const anioStr = anio;
+    if (bitacoraFiltro === "combustible") return `No hay tanqueos en ${anioStr}`;
+    if (bitacoraFiltro === "mantenimiento") return `No hay mantenimientos en ${anioStr}`;
+    if (bitacoraFiltro === "repuestos") return `No hay repuestos en ${anioStr}`;
+    if (busqueda.trim()) return `Sin resultados para "${busqueda}"`;
+    return "Sin registros en este año";
+  }, [anio, bitacoraFiltro, busqueda]);
 
   if (!v) return null;
 
@@ -198,12 +290,13 @@ export function Mantenimientos({
 
       {vista === "historial" && (
         <div className="flex flex-col gap-3">
+          {/* Año chips + total */}
           <div className="flex items-center justify-between gap-2">
             <div className="scroll-x flex gap-1.5">
               {anios.map((a) => (
                 <button
                   key={a}
-                  onClick={() => setAnio(a)}
+                  onClick={() => { setAnio(a); setMes("todos"); }}
                   className="rounded-full px-3 py-1.5 text-xs font-bold transition-colors"
                   style={{
                     background: anio === a ? "var(--brand)" : "var(--surface)",
@@ -218,36 +311,71 @@ export function Mantenimientos({
             <span className="nums ink-2 text-xs font-semibold">{money(totalAnio)}</span>
           </div>
 
-          <div className="scroll-x flex items-center gap-1.5">
-            <Filter size={13} className="ink-3 shrink-0" />
-            <button
-              onClick={() => setFiltro("todos")}
-              className="shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-semibold"
-              style={{
-                background: filtro === "todos" ? "var(--ink)" : "var(--surface)",
-                color: filtro === "todos" ? "var(--surface)" : "var(--ink-2)",
-                border: "1px solid var(--line)",
-              }}
-            >
-              Todos
-            </button>
-            {CATEGORIAS_LISTA.filter((c) => c.id !== "otro").map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setFiltro(c.id)}
-                className="shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-semibold"
-                style={{
-                  background: filtro === c.id ? "var(--brand-soft)" : "var(--surface)",
-                  color: filtro === c.id ? "var(--brand)" : "var(--ink-2)",
-                  border: `1px solid ${filtro === c.id ? "var(--brand)" : "var(--line)"}`,
-                }}
+          {/* Segmented: Todos | Combustible | Mantenimiento | Repuestos */}
+          <Segmented
+            value={bitacoraFiltro}
+            onChange={setBitacoraFiltro}
+            options={[
+              { value: "todos", label: "Todos" },
+              { value: "combustible", label: "Combustible" },
+              { value: "mantenimiento", label: "Mantenimiento" },
+              { value: "repuestos", label: "Repuestos" },
+            ]}
+          />
+
+          {/* Búsqueda + Mes selector */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 shrink-0" style={{ color: "var(--ink-3)" }} />
+              <input
+                type="text"
+                value={busquedaRaw}
+                onChange={(e) => setBusquedaRaw(e.target.value)}
+                placeholder="Buscar por título, taller, nota…"
+                className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] py-2 pl-9 pr-8 text-[0.82rem] outline-none transition-colors focus:border-[var(--brand)]"
+              />
+              {busquedaRaw && (
+                <button
+                  onClick={() => setBusquedaRaw("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 transition-colors hover:bg-[var(--surface-3)]"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X size={14} style={{ color: "var(--ink-3)" }} />
+                </button>
+              )}
+            </div>
+            {mesesDisponibles.length > 0 && (
+              <select
+                value={mes}
+                onChange={(e) => setMes(e.target.value)}
+                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[0.82rem] font-semibold outline-none focus:border-[var(--brand)]"
               >
-                {c.corto}
-              </button>
-            ))}
+                <option value="todos">Mes</option>
+                {mesesDisponibles.map((mk) => {
+                  const [, m] = mk.split("-").map(Number);
+                  const label = MESES_CORTOS[m - 1] ?? `${m}`;
+                  return <option key={mk} value={mk}>{label}</option>;
+                })}
+              </select>
+            )}
           </div>
 
-          {/* Toggle Tarjetas | Tabla */}
+          {/* Resultados count */}
+          {(bitacoraFiltro !== "todos" || mes !== "todos" || busqueda.trim() || filtro !== "todos") && (
+            <div className="flex items-center justify-between">
+              <span className="ink-2 text-[0.72rem] font-medium">
+                {filtradosBitacora.length} resultado{filtradosBitacora.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={limpiarFiltros}
+                className="ink-3 text-[0.7rem] font-semibold transition-colors hover:text-[var(--brand)]"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
+
+          {/* Toggle Tarjetas | Tabla + Export CSV */}
           <div className="flex items-center justify-between">
             <Segmented
               value={tabMode}
@@ -258,37 +386,40 @@ export function Mantenimientos({
                 { value: "table", label: "Tabla" },
               ]}
             />
-            {registros.length > 0 && (
+            {filtradosBitacora.length > 0 && (
               <button className="btn btn-ghost text-[0.72rem] px-2.5 py-1.5" onClick={exportarCSV}>
                 <Download size={13} /> Exportar CSV
               </button>
             )}
           </div>
 
+          {/* Tabla o Tarjetas */}
           {tabMode === "table" ? (
-            registros.length > 0 ? (
-              <TablaMantenimientos registros={registros} onEdit={setEditando} />
+            filtradosBitacora.length > 0 ? (
+              <TablaMantenimientos registros={filtradosBitacora} onEdit={setEditando} />
             ) : (
               <EmptyState
                 icon={<CalendarDays size={22} />}
-                title="Sin registros en este año"
-                description="Cuando registres un servicio o un tanqueo aparecerá aquí, agrupado por mes."
+                title={textoVacio}
+                description="Ajusta los filtros o registra un nuevo servicio."
                 action={
-                  <button className="btn btn-primary" onClick={() => onServicio()}>
-                    Registrar el primero
-                  </button>
+                  <div className="flex gap-2">
+                    <button className="btn btn-soft" onClick={limpiarFiltros}>Limpiar filtros</button>
+                    <button className="btn btn-primary" onClick={() => onServicio()}>Registrar</button>
+                  </div>
                 }
               />
             )
           ) : agrupado.length === 0 ? (
             <EmptyState
               icon={<CalendarDays size={22} />}
-              title="Sin registros en este año"
-              description="Cuando registres un servicio o un tanqueo aparecerá aquí, agrupado por mes."
+              title={textoVacio}
+              description="Ajusta los filtros o registra un nuevo servicio."
               action={
-                <button className="btn btn-primary" onClick={() => onServicio()}>
-                  Registrar el primero
-                </button>
+                <div className="flex gap-2">
+                  <button className="btn btn-soft" onClick={limpiarFiltros}>Limpiar filtros</button>
+                  <button className="btn btn-primary" onClick={() => onServicio()}>Registrar</button>
+                </div>
               }
             />
           ) : (
@@ -304,20 +435,33 @@ export function Mantenimientos({
                         onClick={() => setEditando(m)}
                         className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
                       >
+                        {/* Icono por categoría */}
                         <span
                           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                           style={{ background: `${meta.color}18`, color: meta.color }}
                         >
                           <Icono nombre={meta.icono} size={17} />
                         </span>
+                        {/* Info principal */}
                         <div className="min-w-0 flex-1">
-                          <div className="ink truncate text-[0.85rem] font-semibold">{m.titulo}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="ink truncate text-[0.85rem] font-semibold">{m.titulo}</span>
+                            {m.taller && (
+                              <Chip>{m.taller}</Chip>
+                            )}
+                          </div>
                           <div className="ink-3 nums truncate text-[0.68rem]">
-                            {num(m.km)} km · {formatDate(m.fecha)}
-                            {m.taller ? ` · ${m.taller}` : ""}
+                            <span className="font-medium">{relativa(m.fecha)}</span>
+                            <span className="mx-1">·</span>
+                            <span className="opacity-70">{fechaExacta(m.fecha)}</span>
+                            <span className="mx-1">·</span>
+                            {num(m.km)} km
                           </div>
                         </div>
-                        <span className="nums ink shrink-0 text-[0.8rem] font-bold">{money(m.costo)}</span>
+                        {/* Costo con tabular-nums */}
+                        <span className="nums ink shrink-0 text-[0.8rem] font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {money(m.costo)}
+                        </span>
                         {m.evidencia && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--info)" }} />}
                       </button>
                     );
