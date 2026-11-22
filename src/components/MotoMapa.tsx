@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
-import { resumenZonas, ZONAS, type ZonaId, type ZonaResumen } from "../lib/zonas";
+import { ANGULOS, resumenZonas, ZONAS, type Angulo, type ZonaId, type ZonaResumen } from "../lib/zonas";
 import { useApp } from "../store/AppStore";
 import { num } from "../lib/format";
 
@@ -20,6 +20,7 @@ export function MotoMapa({ onServicio }: { onServicio?: () => void }) {
   const { state } = useApp();
   const resumen = useMemo(() => resumenZonas(state), [state]);
   const [sel, setSel] = useState<ZonaId | null>(null);
+  const [angulo, setAngulo] = useState<Angulo>("izq");
 
   const porId = useMemo(() => {
     const m = new Map<ZonaId, ZonaResumen>();
@@ -33,9 +34,10 @@ export function MotoMapa({ onServicio }: { onServicio?: () => void }) {
     <div>
       <div className="relative overflow-hidden rounded-xl" style={{ background: "#0b0e11" }}>
         <img
-          src="moto-perfil.webp"
-          alt="Perfil izquierdo de la Yamaha XTZ 250"
+          src={ANGULOS.find((a) => a.id === angulo)?.imagen}
+          alt={`Perfil ${angulo === "izq" ? "izquierdo" : "derecho"} de la Yamaha XTZ 250`}
           className="mx-auto w-full max-h-[50vh] select-none object-contain"
+          style={{ filter: "brightness(1.35) contrast(1.15) drop-shadow(0 0 1px rgba(170,186,205,.55))" }}
           draggable={false}
         />
 
@@ -52,8 +54,8 @@ export function MotoMapa({ onServicio }: { onServicio?: () => void }) {
               aria-pressed={activo}
               className="absolute flex h-12 w-12 items-center justify-center rounded-full transition-transform active:scale-95"
               style={{
-                left: `${z.x}%`,
-                top: `${z.y}%`,
+                left: `${z.pos[angulo].x}%`,
+                top: `${z.pos[angulo].y}%`,
                 transform: "translate(-50%, -50%)",
                 background: c.soft,
                 border: `2px solid ${c.ring}`,
@@ -75,6 +77,25 @@ export function MotoMapa({ onServicio }: { onServicio?: () => void }) {
             </button>
           );
         })}
+      </div>
+
+      {/* selector de vista */}
+      <div className="mt-2 flex gap-1.5">
+        {ANGULOS.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => setAngulo(a.id)}
+            aria-pressed={angulo === a.id}
+            className="min-h-[44px] flex-1 rounded-xl border px-2 text-[0.7rem] font-semibold"
+            style={{
+              background: angulo === a.id ? "var(--brand)" : "var(--surface-2)",
+              color: angulo === a.id ? "#0b0e11" : "var(--ink-2)",
+              borderColor: angulo === a.id ? "var(--brand)" : "var(--line)",
+            }}
+          >
+            {a.corto} · {a.etiqueta.split(" ")[1]}
+          </button>
+        ))}
       </div>
 
       {/* leyenda + zonas como chips (para guantes o pantallas angostas) */}

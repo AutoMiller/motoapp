@@ -17,11 +17,18 @@ export type ZonaId =
 
 export type EstadoZona = "ok" | "warning" | "critical";
 
+export type Angulo = "izq" | "der";
+
+export const ANGULOS: { id: Angulo; etiqueta: string; corto: string; imagen: string }[] = [
+  { id: "izq", etiqueta: "Lateral izquierdo", corto: "IZQ", imagen: "moto-perfil.webp" },
+  { id: "der", etiqueta: "Lateral derecho", corto: "DER", imagen: "moto-perfil-der.webp" },
+];
+
 export interface Zona {
   id: ZonaId;
   nombre: string;
-  x: number; // %
-  y: number; // %
+  /** Centro del pin por ángulo, en % de la imagen. */
+  pos: Record<Angulo, { x: number; y: number }>;
   descripcion: string;
   /** Palabras que emparejan un componente del plan con esta zona. */
   claves: string[];
@@ -30,49 +37,43 @@ export interface Zona {
 export const ZONAS: Zona[] = [
   {
     id: "motor",
+    pos: { izq: { x: 42, y: 63 }, der: { x: 47, y: 62 } },
     nombre: "Motor y lubricación",
-    x: 42,
-    y: 63,
     descripcion: "Aceite, filtro, bujía, válvulas y refrigeración.",
     claves: ["aceite", "motor", "bujia", "bujía", "valvula", "válvula", "refriger", "inyec", "carbur"],
   },
   {
     id: "transmision",
+    pos: { izq: { x: 62, y: 71 }, der: { x: 35, y: 70 } },
     nombre: "Transmisión",
-    x: 62,
-    y: 71,
     descripcion: "Cadena, piñón, catalina y kit de arrastre.",
     claves: ["cadena", "arrastre", "piñon", "piñón", "catalina", "sprocket"],
   },
   {
     id: "tren-delantero",
+    pos: { izq: { x: 12, y: 70 }, der: { x: 78, y: 78 } },
     nombre: "Tren delantero",
-    x: 12,
-    y: 70,
     descripcion: "Llanta, disco, pastillas, líquido y horquilla.",
     claves: ["delanter", "horquilla", "llanta del", "disco del", "pastilla del", "freno del", "abs del"],
   },
   {
     id: "tren-trasero",
+    pos: { izq: { x: 77, y: 77 }, der: { x: 22, y: 76 } },
     nombre: "Tren trasero",
-    x: 77,
-    y: 77,
     descripcion: "Llanta, pastillas traseras, amortiguador y bieletas.",
     claves: ["traser", "llanta tras", "amortiguador", "pro-link", "prolink", "bieleta", "buje"],
   },
   {
     id: "admision-asiento",
+    pos: { izq: { x: 55, y: 37 }, der: { x: 40, y: 38 } },
     nombre: "Admisión y asiento",
-    x: 55,
-    y: 37,
     descripcion: "Filtro de aire, batería, fusibles y herramientas.",
     claves: ["filtro de aire", "aire", "bateria", "batería", "fusible", "herramienta", "kit"],
   },
   {
     id: "controles-direccion",
+    pos: { izq: { x: 29, y: 26 }, der: { x: 64, y: 22 } },
     nombre: "Controles y dirección",
-    x: 29,
-    y: 26,
     descripcion: "Guayas, luces, direccionales, espejos y rodamientos.",
     claves: ["guaya", "cable", "luz", "faro", "direccional", "espejo", "direccion", "dirección", "manubrio"],
   },
