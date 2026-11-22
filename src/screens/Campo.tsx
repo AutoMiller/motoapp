@@ -69,8 +69,6 @@ export function Campo() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-1 text-xl font-bold">Manual de Campo</h1>
-      <p className="ink-2 mb-5 text-sm">Trail.Hacker OS — referencia rápida para el dueño</p>
 
       <div className="flex flex-col gap-3">
         {/* 1. Llaves y Copas */}

@@ -1,10 +1,9 @@
-import { TORQUES } from "../data/torques";
+import { TORQUES } from "../data/ficha";
 
 /**
  * Tarjeta de torques oficiales — Yamaha XTZ 250 ABS.
  *
- * Lee el array TORQUES desde ../data/torques (se moverá a ficha.ts
- * cuando exista el export correspondiente en ese módulo).
+ * Lee el array TORQUES desde ../data/ficha (fuente única).
  * Sin props obligatorias.
  */
 export function TarjetaTorques() {
@@ -40,7 +39,7 @@ export function TarjetaTorques() {
                 <td className="nums ink py-2.5 text-right font-semibold">
                   {t.nm}
                 </td>
-                <td className="nums ink-2 py-2.5 text-right">{t.kgfm}</td>
+                <td className="nums ink-2 py-2.5 text-right">{t.kgf}</td>
               </tr>
             ))}
           </tbody>

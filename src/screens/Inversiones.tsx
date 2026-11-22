@@ -23,10 +23,6 @@ function intervaloLabel(km: number | null, meses: number | null): string {
 export function Inversiones() {
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="ink text-[1.35rem] font-extrabold tracking-tight">Inversiones</h1>
-        <p className="ink-2 text-[0.8rem]">Historial real de servicios, aditamentos y devoluciones</p>
-      </div>
 
       {/* Tarjetas de resumen */}
       <div className="grid grid-cols-3 gap-2">

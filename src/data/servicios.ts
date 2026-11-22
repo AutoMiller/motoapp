@@ -185,8 +185,8 @@ export const ADITAMENTOS: Aditamento[] = [
     fecha: "2025-08-09",
     articulo: "Guantes Fox Racing Dirtpaw Azules",
     proveedor: "Amazon",
-    valor: 33_140, // USD $33.14 ≈ COP (valor referencial)
-    estado: "Activo",
+    valor: 0, // pagado en USD 33,14: no se convierte a COP para no inflar el total
+    estado: "Activo · USD 33,14",
   },
   {
     fecha: "2025-09-06",

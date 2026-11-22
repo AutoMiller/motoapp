@@ -15,6 +15,8 @@ import { proximaRTM } from "../lib/legal";
 import { ModalComponente, ModalDocumento, ModalVehiculo } from "../components/formularios";
 import { Recursos } from "../components/Recursos";
 import { Auditoria } from "../components/Auditoria";
+import { TarjetaPresiones } from "../components/TarjetaPresiones";
+import { TarjetaTorques } from "../components/TarjetaTorques";
 
 export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMantenimiento) => void }) {
   const { state, capacidades, guardarVehiculo, borrarDocumento } = useApp();
@@ -214,6 +216,10 @@ export function Vehiculo({ onServicio }: { onServicio: (categoria?: CategoriaMan
           <Plus size={15} /> Registrar servicio hecho
         </button>
       </div>
+
+      <TarjetaPresiones />
+
+      <TarjetaTorques />
 
       <Recursos />
 

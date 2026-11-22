@@ -60,6 +60,8 @@ export type Seccion =
   | "ajustes"
   | "viajes"
   | "fusibles"
+  | "campo"
+  | "inversiones"
   | "gastos";
 
 /** Posiciones en % calculadas sobre el viewBox del SVG (15 45 375 140). */
