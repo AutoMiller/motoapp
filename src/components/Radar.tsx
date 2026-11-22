@@ -73,7 +73,7 @@ export function Radar({ ir }: { ir: (s: SeccionRadar) => void }) {
           titulo: `${d.componente.nombre}: ${d.estado === "vencido" ? "pasado de intervalo" : "cerca del cambio"}`,
           detalle: d.kmRestantes > 0
             ? `Quedan ${Math.round(d.kmRestantes)} km · próximo a ${Math.round(d.proximoKm)} km`
-            : `${Math.round(Math.abs(d.kmRestantes))} km pasados`,
+            : `${Math.round(d.kmExcedidos || d.kmRecorridos - d.componente.intervaloKm)} km pasados · tocaba a ${Math.round(d.proximoKm)} km`,
           ir: "plan",
         });
       }
