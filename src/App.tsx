@@ -19,9 +19,10 @@ import { Campo } from "./screens/Campo";
 import { Inversiones } from "./screens/Inversiones";
 import { Ajustes, ZonaMoto } from "./screens/Ajustes";
 import { Sheet } from "./components/Sheet";
-import { ModalMantenimiento, ModalTanqueo, ModalVehiculo } from "./components/formularios";
+import { ModalMantenimiento, ModalVehiculo } from "./components/formularios";
 import { Icono } from "./components/iconos";
 import { BottomNav } from "./components/BottomNav";
+import { QuickTanqueo } from "./components/QuickTanqueo";
 import type { Destino } from "./components/BottomNav";
 
 export default function App() {
@@ -253,7 +254,7 @@ function Contenido() {
       </Sheet>
 
       <ModalMantenimiento open={mant.open} onClose={() => setMant({ open: false })} categoriaInicial={mant.categoria} />
-      <ModalTanqueo open={tanqueo} onClose={() => setTanqueo(false)} />
+      <QuickTanqueo open={tanqueo} onClose={() => setTanqueo(false)} />
       <ModalVehiculo open={vehiculoModal} onClose={() => setVehiculoModal(false)} />
       <ZonaMoto open={puntos} onClose={() => setPuntos(false)} />
 

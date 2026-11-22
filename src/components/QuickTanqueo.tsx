@@ -195,7 +195,7 @@ export function QuickTanqueo({ open, onClose }: { open: boolean; onClose: () => 
     <>
       {/* Overlay oscuro */}
       <div
-        className="fixed inset-0 z-40 transition-opacity"
+        className="fixed inset-0 z-[68] transition-opacity"
         style={{ background: "rgb(0 0 0 / .45)" }}
         onClick={onClose}
         aria-hidden="true"
@@ -207,12 +207,12 @@ export function QuickTanqueo({ open, onClose }: { open: boolean; onClose: () => 
         role="dialog"
         aria-modal="true"
         aria-label="Tanqueo rápido"
-        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col transition-transform duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 z-[70] flex flex-col transition-transform duration-300 ease-out"
         style={{
           transform: open ? "translateY(0)" : "translateY(100%)",
         }}
       >
-        <div className="mx-auto w-full max-w-md rounded-t-3xl shadow-2xl" style={{ background: "var(--surface)" }}>
+        <div className="mx-auto flex max-h-[88dvh] w-full max-w-md flex-col rounded-t-3xl shadow-2xl" style={{ background: "var(--surface)" }}>
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--line)] px-4 pt-4 pb-3">
             <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export function QuickTanqueo({ open, onClose }: { open: boolean; onClose: () => 
           </div>
 
           {/* Campos */}
-          <div className="flex flex-col gap-3 px-4 py-3 max-h-[70vh] overflow-y-auto">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
             {/* Fecha */}
             <label className="field">
               <span className="label">Fecha</span>
@@ -380,7 +380,7 @@ export function QuickTanqueo({ open, onClose }: { open: boolean; onClose: () => 
           </div>
 
           {/* Footer con botón Guardar */}
-          <div className="border-t border-[var(--line)] px-4 py-3">
+          <div className="shrink-0 border-t border-[var(--line)] px-4 py-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
             <button
               className="btn btn-primary w-full justify-center py-2.5 text-sm font-bold"
               disabled={!canSave}
