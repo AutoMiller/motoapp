@@ -21,6 +21,8 @@ import { Ajustes, ZonaMoto } from "./screens/Ajustes";
 import { Sheet } from "./components/Sheet";
 import { ModalMantenimiento, ModalTanqueo, ModalVehiculo } from "./components/formularios";
 import { Icono } from "./components/iconos";
+import { BottomNav } from "./components/BottomNav";
+import type { Destino } from "./components/BottomNav";
 
 export default function App() {
   const [backend, setBackend] = useState<{ backend: Backend; etiqueta?: string } | null>(null);
@@ -74,13 +76,26 @@ const TITULOS: Record<Seccion, { titulo: string; sub: string }> = {
   inversiones: { titulo: "Inversiones", sub: "Servicios, aditamentos e intervalos reales" },
 };
 
+const DESTINO_A_SECCION: Record<Destino, Seccion> = {
+  inicio: "menu",
+  plan: "plan",
+  bitacora: "historial",
+  garaje: "documentos",
+};
+
 function Contenido() {
   const { state, cargado, cargarDemo, aviso, guardando, limpiarAviso, errorCarga, recargar } = useApp();
   const [seccion, setSeccion] = useState<Seccion | null>(null);
+  const [destinoActivo, setDestinoActivo] = useState<Destino>("inicio");
   const [puntos, setPuntos] = useState(false);
   const [mant, setMant] = useState<{ open: boolean; categoria?: CategoriaMantenimiento }>({ open: false });
   const [tanqueo, setTanqueo] = useState(false);
   const [vehiculoModal, setVehiculoModal] = useState(false);
+
+  const navegarDestino = (d: Destino) => {
+    setDestinoActivo(d);
+    setSeccion(DESTINO_A_SECCION[d]);
+  };
 
   useEffect(() => {
     if (!cargado) return;
@@ -162,9 +177,17 @@ function Contenido() {
 
   const abrirServicio = (categoria?: CategoriaMantenimiento) => setMant({ open: true, categoria });
 
+  // Secciones que NO están en los 4 destinos principales del BottomNav
+  const secundarias = MENU.filter(
+    (m) =>
+      m.id !== "documentos" &&
+      m.id !== "historial" &&
+      m.id !== "plan"
+  );
+
   return (
     <>
-      <main className="mx-auto w-full max-w-5xl px-3 pt-3 sm:px-5">
+      <main className="mx-auto w-full max-w-5xl px-3 pt-2 pb-24 sm:px-5">
         <Dashboard
           onServicio={abrirServicio}
           onTanqueo={() => setTanqueo(true)}
@@ -183,7 +206,31 @@ function Contenido() {
         {seccion === "menu" && <Menu onAbrir={setSeccion} />}
         {seccion === "historial" && <Mantenimientos onServicio={abrirServicio} />}
         {seccion === "plan" && <Mantenimientos onServicio={abrirServicio} />}
-        {seccion === "documentos" && <Vehiculo onServicio={abrirServicio} />}
+        {seccion === "documentos" && (
+          <>
+            <Vehiculo onServicio={abrirServicio} />
+            <div className="mt-4">
+              <h3 className="ink mb-2 text-[0.88rem] font-bold">Todo lo demás</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {secundarias.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setSeccion(m.id)}
+                    className="card flex flex-col items-start gap-2 p-3.5 text-left"
+                  >
+                    <span
+                      className="flex h-9 w-9 items-center justify-center rounded-xl"
+                      style={{ background: "var(--brand-soft)", color: "var(--brand)" }}
+                    >
+                      <Icono nombre={m.icono} size={17} />
+                    </span>
+                    <span className="ink text-[0.78rem] font-semibold leading-tight">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
         {seccion === "alertas" && (
           <Alertas
             ir={(r) => {
@@ -211,7 +258,7 @@ function Contenido() {
       <ZonaMoto open={puntos} onClose={() => setPuntos(false)} />
 
       {aviso && (
-        <div className="no-print fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 lg:bottom-8">
+        <div className="no-print fixed inset-x-0 bottom-28 z-[60] flex justify-center px-4 lg:bottom-8">
           <button
             onClick={limpiarAviso}
             className="pop flex max-w-md items-center gap-2 rounded-2xl px-4 py-2.5 text-[0.78rem] font-semibold text-white shadow-lg"
@@ -231,6 +278,18 @@ function Contenido() {
           Guardando en la hoja…
         </div>
       )}
+
+      <BottomNav
+        activo={destinoActivo}
+        onNavigate={navegarDestino}
+        onTanqueo={() => setTanqueo(true)}
+        onServicio={() => abrirServicio()}
+        onEditarKm={() => setVehiculoModal(true)}
+        onCadena={() => {
+          setSeccion(null);
+          document.getElementById("cadena")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
     </>
   );
 }
