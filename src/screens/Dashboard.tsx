@@ -17,7 +17,6 @@ import {
   Link2,
   ListChecks,
   MapPin,
-  MoreHorizontal,
   Package,
   Pause,
   Play,
@@ -110,22 +109,9 @@ export function Dashboard({
   const [cmd, setCmd] = useState("");
   const [msg, setMsg] = useState("");
   const [timer, setTimer] = useState<{ nombre: string; total: number; restante: number; activo: boolean } | null>(null);
-  const [dockVisible, setDockVisible] = useState(true);
   const relojRef = useRef<number | null>(null);
   const sembradoRef = useRef(false);
 
-  useEffect(() => {
-    let anterior = window.scrollY;
-    const alScroll = () => {
-      const y = window.scrollY;
-      if (y < 90) setDockVisible(true);
-      else if (y > anterior + 14) setDockVisible(false);
-      else if (y < anterior - 14) setDockVisible(true);
-      anterior = y;
-    };
-    window.addEventListener("scroll", alScroll, { passive: true });
-    return () => window.removeEventListener("scroll", alScroll);
-  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => setAhora(new Date()), 30_000);
@@ -268,7 +254,7 @@ export function Dashboard({
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-32">
+    <div className="flex flex-col gap-4 pb-24">
       {/* ---------------- Barra superior ---------------- */}
       <div className="flex items-center justify-between gap-2 px-0.5">
         <div className="flex items-center gap-2">
@@ -937,41 +923,6 @@ export function Dashboard({
         </button>
       </div>
 
-      {/* ---------------- Dock ---------------- */}
-      <nav
-        className="dock no-print"
-        aria-label="Acciones rápidas"
-        aria-hidden={!dockVisible}
-        style={{
-          transform: dockVisible ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(140%)",
-          transition: "transform .28s cubic-bezier(.16,1,.3,1), opacity .2s",
-          opacity: dockVisible ? 1 : 0,
-        }}
-      >
-        <button className="dock-btn" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          <Gauge size={17} style={{ color: "var(--brand)" }} />
-          Inicio
-        </button>
-        <button className="dock-btn primario" onClick={() => onServicio()}>
-          <Plus size={18} />
-          Servicio
-        </button>
-        <button className="dock-btn" onClick={onTanqueo}>
-          <Fuel size={17} />
-          Tanqueo
-        </button>
-        <button
-          className="dock-btn"
-          onClick={() => document.getElementById("cadena")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        >
-          <Link2 size={17} />
-          Cadena
-        </button>
-        <button className="dock-btn" onClick={() => onAbrir("menu")}>
-          <MoreHorizontal size={17} />
-          Más
-        </button>
-      </nav>
     </div>
   );
 }
