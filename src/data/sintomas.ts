@@ -42,10 +42,9 @@ export const SINTOMAS: SintomaElectrico[] = [
       },
       {
         orden: 2,
-        accion: "Revisar el fusible de encendido",
+        accion: "Comprobar la batería y sus bornes",
         detalle:
-          "En la caja debajo del asiento, busca el fusible de encendido (puesto 3 en ABS o «Encendido» en carburada). Verifica que el filamento esté intacto.",
-        fusibleId: 3,
+          "Mide el voltaje en los bornes con la moto apagada: por debajo de 12,4 V la batería está descargada y no mueve el arranque. Revisa que los bornes estén apretados y sin sulfato. En la variante carburada, además, hay un fusible de encendido dentro de la caja; en la ABS no existe como fusible separado.",
       },
       {
         orden: 3,
