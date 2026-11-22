@@ -364,3 +364,261 @@ export function edadMeses(desde: string, hasta = isoDate()): number {
   const b = parseISO(hasta);
   return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
 }
+
+/* ---------------- KPIs reales y proyecciones ---------------- */
+
+/** Factor de conversión galones → litros (US gallon). */
+const GALON_A_LITRO = 3.785;
+
+/**
+ * Consumo real de combustible basado en tramos válidos.
+ *
+ * Usa SOLO intervalos entre tanqueos consecutivos donde ambos tienen
+ * tanqueLleno === true y el kilometraje es estrictamente creciente.
+ * Los registros inválidos se descartan en vez de promediar basura.
+ */
+export function consumoReal(state: AppState): {
+  kmL: number | null;
+  kmGal: number | null;
+  muestras: number;
+  desde: string | null;
+} {
+  const lista = state.mantenimientos
+    .filter((m) => m.tanqueo)
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.km - b.km));
+
+  const tramos: number[] = [];
+  let previo: { km: number; fecha: string } | null = null;
+  let primeraFecha: string | null = null;
+
+  for (const m of lista) {
+    const t = m.tanqueo!;
+    // Solo consideramos tanqueos con tanque lleno como puntos de referencia
+    if (!t.tanqueLleno) continue;
+
+    if (previo !== null && m.km > previo.km && t.galones > 0) {
+      const km = m.km - previo.km;
+      const litros = t.galones * GALON_A_LITRO;
+      tramos.push(km / litros);
+    }
+
+    if (primeraFecha === null) primeraFecha = m.fecha;
+    previo = { km: m.km, fecha: m.fecha };
+  }
+
+  if (tramos.length === 0) {
+    return { kmL: null, kmGal: null, muestras: 0, desde: null };
+  }
+
+  const kmL = tramos.reduce((a, b) => a + b, 0) / tramos.length;
+  return {
+    kmL: Math.round(kmL * 100) / 100,
+    kmGal: Math.round(kmL * GALON_A_LITRO * 100) / 100,
+    muestras: tramos.length,
+    desde: primeraFecha,
+  };
+}
+
+/**
+ * Desglose del costo por kilómetro recorrido.
+ *
+ * Calcula el costo/km de solo combustible vs el total (combustible +
+ * mantenimientos + documentos pagados) sobre los km del periodo con datos.
+ */
+export function desgloseCostoKm(state: AppState): {
+  soloCombustible: number;
+  total: number;
+  km: number;
+} {
+  const v = state.vehiculo;
+  if (!v) return { soloCombustible: 0, total: 0, km: 0 };
+
+  // Determinamos el rango de km con datos
+  const candidatos = [
+    ...state.mantenimientos.map((m) => m.km),
+    ...(v.kmInicial !== undefined ? [v.kmInicial] : []),
+  ].filter((n) => Number.isFinite(n));
+  const base = candidatos.length ? Math.min(...candidatos) : v.kmActual;
+  const kmRecorridos = Math.max(1, v.kmActual - base);
+
+  // Costo solo de combustible (tanqueos)
+  const costoCombustible = state.mantenimientos.reduce((a, m) => a + (m.tanqueo ? m.costo || 0 : 0), 0);
+
+  // Costo de mantenimientos (sin tanqueos)
+  const costoMantenimiento = state.mantenimientos.reduce(
+    (a, m) => a + (m.tanqueo ? 0 : m.costo || 0),
+    0,
+  );
+
+  // Costo de documentos pagados
+  const costoDocumentos = state.documentos.reduce((a, d) => a + (d.valor || 0), 0);
+
+  const costoTotal = costoCombustible + costoMantenimiento + costoDocumentos;
+
+  return {
+    soloCombustible: Math.round((costoCombustible / kmRecorridos) * 100) / 100,
+    total: Math.round((costoTotal / kmRecorridos) * 100) / 100,
+    km: kmRecorridos,
+  };
+}
+
+/**
+ * Alerta de caída de consumo de combustible.
+ *
+ * Compara el rendimiento del último tramo válido contra el promedio de los
+ * últimos 5 tramos válidos. Se activa si el último cae más de un 15%
+ * respecto al promedio.
+ */
+export function alertaConsumo(state: AppState): {
+  caidaPct: number;
+  media: number;
+  ultimo: number;
+  activa: boolean;
+} {
+  // Obtenemos los tramos válidos de consumo (mismo criterio que consumoReal)
+  const lista = state.mantenimientos
+    .filter((m) => m.tanqueo)
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.km - b.km));
+
+  const tramos: number[] = [];
+  let previo: { km: number } | null = null;
+
+  for (const m of lista) {
+    const t = m.tanqueo!;
+    if (!t.tanqueLleno) continue;
+    if (previo !== null && m.km > previo.km && t.galones > 0) {
+      const km = m.km - previo.km;
+      const litros = t.galones * GALON_A_LITRO;
+      tramos.push(km / litros);
+    }
+    if (t.tanqueLleno) previo = { km: m.km };
+  }
+
+  // Necesitamos al menos 2 tramos para comparar
+  if (tramos.length < 2) {
+    return { caidaPct: 0, media: 0, ultimo: 0, activa: false };
+  }
+
+  const ultimo = tramos[tramos.length - 1];
+  // Promedio de los últimos 5 tramos (incluyendo el último)
+  const ultimos5 = tramos.slice(-5);
+  const media = ultimos5.reduce((a, b) => a + b, 0) / ultimos5.length;
+
+  if (media === 0) {
+    return { caidaPct: 0, media: 0, ultimo, activa: false };
+  }
+
+  // Caída porcentual: positivo = el último es menor que el promedio
+  const caidaPct = Math.round(((media - ultimo) / media) * 10000) / 100;
+  const activa = caidaPct > 15;
+
+  return {
+    caidaPct,
+    media: Math.round(media * 100) / 100,
+    ultimo: Math.round(ultimo * 100) / 100,
+    activa,
+  };
+}
+
+/**
+ * Proyección de la fecha del próximo servicio.
+ *
+ * Usa el ritmo real de uso (km/día) para estimar cuándo se alcanzará el
+ * próximo intervalo del componente. Si el ritmo es 0 o no hay datos,
+ * devuelve fecha null y motivo 'sin-datos'.
+ */
+export function proyeccionServicio(
+  d: Desgaste,
+  ritmoKmDia: number,
+  hoy: string = isoDate(),
+): {
+  fecha: string | null;
+  km: number;
+  motivo: "km" | "tiempo" | "sin-datos";
+} {
+  // Sin ritmo de uso no podemos proyectar
+  if (ritmoKmDia <= 0 || d.kmRestantes <= 0) {
+    return { fecha: null, km: d.proximoKm, motivo: "sin-datos" };
+  }
+
+  // Días estimados para alcanzar el próximo intervalo por km
+  const diasEstimados = Math.ceil(d.kmRestantes / ritmoKmDia);
+  const fechaProy = new Date(parseISO(hoy));
+  fechaProy.setDate(fechaProy.getDate() + diasEstimados);
+
+  // Comparamos con la proyección por tiempo
+  const fechaTiempo = d.proximoVencimiento ? parseISO(d.proximoVencimiento) : null;
+
+  if (fechaTiempo && fechaTiempo < fechaProy) {
+    // El tiempo vence antes que el kilometraje
+    return {
+      fecha: d.proximoVencimiento,
+      km: d.proximoKm,
+      motivo: "tiempo",
+    };
+  }
+
+  return {
+    fecha: isoDate(fechaProy),
+    km: d.proximoKm,
+    motivo: "km",
+  };
+}
+
+/**
+ * Índice de salud del vehículo (0-100).
+ *
+ * Combina tres dimensiones:
+ * - Plan de mantenimiento (peso 55%): % de componentes activos con vida restante > 0.
+ * - Documentos legales (peso 25%): % de documentos con fecha de vencimiento que están vigentes.
+ * - Tareas de checklist (peso 20%): % de tareas completadas.
+ *
+ * La saludVehiculo existente se mantiene sin cambios.
+ */
+export function indiceSalud(state: AppState): {
+  score: number;
+  partes: { plan: number; legal: number; tareas: number };
+} {
+  // 1. Plan de mantenimiento: % de componentes activos con vida restante > 0
+  const activos = state.componentes.filter((c) => c.activo);
+  let planScore = 100; // sin componentes = perfecto
+  if (activos.length > 0) {
+    const km = state.vehiculo?.kmActual ?? 0;
+    const conVida = activos.filter((c) => {
+      const d = desgasteDe(c, km);
+      return d.restantePct > 0;
+    });
+    planScore = (conVida.length / activos.length) * 100;
+  }
+
+  // 2. Documentos legales: % de documentos con vencimiento que están vigentes
+  const docsConFecha = state.documentos.filter((d) => Boolean(d.fechaVencimiento));
+  let legalScore = 100; // sin documentos = perfecto
+  if (docsConFecha.length > 0) {
+    const vigentes = docsConFecha.filter((d) => {
+      const dias = daysUntil(d.fechaVencimiento!, isoDate());
+      return dias >= 0;
+    });
+    legalScore = (vigentes.length / docsConFecha.length) * 100;
+  }
+
+  // 3. Tareas de checklist: % de tareas completadas
+  let tareasScore = 100; // sin tareas = perfecto
+  if (state.tareas.length > 0) {
+    const completadas = state.tareas.filter((t) => t.hecho);
+    tareasScore = (completadas.length / state.tareas.length) * 100;
+  }
+
+  const score = Math.round(
+    clamp(planScore * 0.55 + legalScore * 0.25 + tareasScore * 0.2, 0, 100),
+  );
+
+  return {
+    score,
+    partes: {
+      plan: Math.round(planScore),
+      legal: Math.round(legalScore),
+      tareas: Math.round(tareasScore),
+    },
+  };
+}

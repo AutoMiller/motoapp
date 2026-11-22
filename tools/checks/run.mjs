@@ -172,6 +172,103 @@ test("Ritmo km/día con historial real", () => {
   assert.ok(r > 20 && r < 45, `ritmo=${r}`);
 });
 
+/* --------------------------- KPIs reales --------------------------- */
+
+test("consumoReal ignora tanqueos sin tanqueLleno", () => {
+  const st = {
+    vehiculo: { kmActual: 2000 }, componentes: [], documentos: [], alertas: [],
+    mantenimientos: [
+      { id: "1", fecha: "2026-10-01", km: 1000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+      { id: "2", fecha: "2026-10-10", km: 1500, costo: 80000, categoria: "combustible",
+        tanqueo: { galones: 8, precioGalon: 16000, tanqueLleno: false } },
+      { id: "3", fecha: "2026-10-20", km: 2000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+    ],
+  };
+  const r = calc.consumoReal(st);
+  // Solo hay un tramo válido: 1000→2000 (1000 km / 10 gal × 3.785 = 26.42 km/L)
+  assert.equal(r.muestras, 1, `muestras=${r.muestras}`);
+  assert.ok(r.kmL !== null, "kmL no debe ser null");
+  assert.ok(Math.abs(r.kmL - 26.42) < 0.1, `kmL=${r.kmL}`);
+});
+
+test("consumoReal descarta km no creciente", () => {
+  const st = {
+    vehiculo: { kmActual: 2000 }, componentes: [], documentos: [], alertas: [],
+    mantenimientos: [
+      { id: "1", fecha: "2026-10-01", km: 1000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+      { id: "2", fecha: "2026-10-10", km: 900, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+      { id: "3", fecha: "2026-10-20", km: 2000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+    ],
+  };
+  const r = calc.consumoReal(st);
+  // El tramo 1000→900 se descarta; solo 1000→2000 es válido (1 tramo)
+  assert.equal(r.muestras, 1, `muestras=${r.muestras}`);
+  assert.ok(r.kmL !== null, "kmL no debe ser null");
+});
+
+test("consumoReal: kmGal = kmL × 3,785", () => {
+  const st = {
+    vehiculo: { kmActual: 2000 }, componentes: [], documentos: [], alertas: [],
+    mantenimientos: [
+      { id: "1", fecha: "2026-10-01", km: 1000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+      { id: "2", fecha: "2026-10-20", km: 2000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+    ],
+  };
+  const r = calc.consumoReal(st);
+  assert.ok(r.kmL !== null && r.kmGal !== null, "ambos deben tener valor");
+  // kmGal debe ser kmL × 3.785
+  assert.ok(Math.abs(r.kmGal - r.kmL * 3.785) < 0.1, `kmGal=${r.kmGal} vs kmL*3.785=${r.kmL * 3.785}`);
+});
+
+test("alertaConsumo no se activa con datos insuficientes", () => {
+  const st = {
+    vehiculo: { kmActual: 1500 }, componentes: [], documentos: [], alertas: [],
+    mantenimientos: [
+      { id: "1", fecha: "2026-10-01", km: 1000, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+      { id: "2", fecha: "2026-10-20", km: 1500, costo: 100000, categoria: "combustible",
+        tanqueo: { galones: 10, precioGalon: 16000, tanqueLleno: true } },
+    ],
+  };
+  const r = calc.alertaConsumo(st);
+  // Con solo 1 tramo válido, no hay suficientes datos para comparar
+  assert.equal(r.activa, false, "no debe activarse con 1 tramo");
+  assert.equal(r.caidaPct, 0);
+});
+
+test("proyeccionServicio devuelve null con ritmo 0", () => {
+  const comp = {
+    id: "c1", nombre: "Aceite", categoria: "motor", activo: true,
+    ultimoKm: 0, ultimaFecha: HOY, intervaloKm: 5000, intervaloMeses: 6,
+    costoEstimado: 80000,
+  };
+  const d = calc.desgasteDe(comp, 1000, HOY);
+  const r = calc.proyeccionServicio(d, 0, HOY);
+  assert.equal(r.fecha, null, "fecha debe ser null con ritmo 0");
+  assert.equal(r.motivo, "sin-datos");
+});
+
+test("indiceSalud entre 0 y 100 con estado vacío", () => {
+  const st = {
+    vehiculo: null, componentes: [], documentos: [], mantenimientos: [],
+    alertas: [], tareas: [],
+  };
+  const r = calc.indiceSalud(st);
+  assert.ok(r.score >= 0 && r.score <= 100, `score=${r.score}`);
+  // Con todo vacío, cada parte debe ser 100
+  assert.equal(r.partes.plan, 100);
+  assert.equal(r.partes.legal, 100);
+  assert.equal(r.partes.tareas, 100);
+  assert.equal(r.score, 100);
+});
+
 /* ------------------------------ pico y placa ----------------------------- */
 const pico = await load("picoPlaca");
 
