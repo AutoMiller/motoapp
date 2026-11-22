@@ -3,6 +3,7 @@ import { ChevronRight, Wrench } from "lucide-react";
 import { ANGULOS, resumenZonas, ZONAS, type Angulo, type ZonaId, type ZonaResumen } from "../lib/zonas";
 import { useApp } from "../store/AppStore";
 import { num } from "../lib/format";
+import { buscarPiezaDeComponente } from "../data/partes";
 
 const COLOR: Record<string, { fg: string; soft: string; ring: string }> = {
   ok: { fg: "var(--ok)", soft: "rgba(34,197,94,.16)", ring: "rgba(34,197,94,.45)" },
@@ -160,10 +161,23 @@ export function MotoMapa({ onServicio }: { onServicio?: () => void }) {
                     ? `Faltan ${num(Math.round(d.kmRestantes))} km`
                     : `${num(Math.round(d.kmExcedidos || 0))} km pasados`;
                 return (
-                  <li key={d.componente.id} className="flex items-center gap-2 py-2">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: c.fg }} />
-                    <span className="ink min-w-0 flex-1 truncate text-[0.78rem] font-semibold">
-                      {d.componente.nombre}
+                  <li key={d.componente.id} className="flex items-start gap-2 py-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: c.fg }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="ink block truncate text-[0.78rem] font-semibold">
+                        {d.componente.nombre}
+                      </span>
+                      {(() => {
+                        const pieza = buscarPiezaDeComponente(d.componente.nombre, d.componente.categoria);
+                        if (!pieza) return null;
+                        return (
+                          <span className="ink-3 block text-[0.62rem] leading-snug">
+                            <span style={{ color: "var(--brand)" }}>{pieza.specBadge}</span>
+                            {" · "}
+                            {pieza.inspectionTip}
+                          </span>
+                        );
+                      })()}
                     </span>
                     <span className="nums ink-2 shrink-0 text-[0.7rem]">{detalle}</span>
                   </li>
