@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   BatteryCharging,
   Bike,
@@ -40,7 +39,8 @@ import {
 } from "../lib/calc";
 import { formatDate, isoDate, money, moneyShort, num } from "../lib/format";
 import { ciudadPorId, evaluarPicoPlaca } from "../lib/picoPlaca";
-import { CAPACIDAD_TANQUE_L, CONSUMO_REF_KML, SUBSISTEMAS, TAREAS_SEED } from "../data/trail";
+import { CAPACIDAD_TANQUE_L, CONSUMO_REF_KML, TAREAS_SEED } from "../data/trail";
+import { MotoMapa } from "../components/MotoMapa";
 import { BarrasMensuales } from "../components/charts";
 import { Chip, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
@@ -63,15 +63,6 @@ export type Seccion =
   | "gastos";
 
 /** Posiciones en % calculadas sobre el viewBox del SVG (15 45 375 140). */
-const POS: Record<string, { x: number; y: number }> = {
-  arrastre: { x: 30.5, y: 72 },
-  motor: { x: 52.5, y: 58.5 },
-  electrico: { x: 48, y: 35.5 },
-  tablero: { x: 72.8, y: 18 },
-  ruedas: { x: 80.8, y: 66.5 },
-  chasis: { x: 62.5, y: 39.5 },
-  seguridad: { x: 24.8, y: 39.5 },
-};
 
 export function Dashboard({
   onServicio,
@@ -98,7 +89,6 @@ export function Dashboard({
   const v = state.vehiculo;
 
   const [lcd, setLcd] = useState(0);
-  const [subId, setSubId] = useState<string>("motor");
   const [verChecklist, setVerChecklist] = useState(false);
   const [verCadena, setVerCadena] = useState(false);
   const [tab, setTab] = useState<"kit" | "pendiente">("kit");
@@ -191,18 +181,6 @@ export function Dashboard({
   ];
   const actual = lcdItems[lcd % lcdItems.length];
 
-  function estadoSub(s: (typeof SUBSISTEMAS)[number]) {
-    const rel = ds.filter((d) => s.categorias.includes(d.componente.categoria));
-    if (rel.length === 0) return { tono: "info" as const, texto: "Sin datos" };
-    if (rel.some((d) => d.estado === "vencido")) return { tono: "bad" as const, texto: "Vencido" };
-    const min = Math.min(...rel.map((d) => d.restantePct));
-    if (min <= 0.15) return { tono: "bad" as const, texto: "Urgente" };
-    if (min <= 0.35) return { tono: "warn" as const, texto: "Próximo" };
-    return { tono: "ok" as const, texto: "Al día" };
-  }
-
-  const sub = SUBSISTEMAS.find((s) => s.id === subId) ?? SUBSISTEMAS[0];
-  const subEstado = estadoSub(sub);
 
   function alternar(t: Tarea) {
     guardarTarea({ ...t, hecho: !t.hecho });
@@ -225,13 +203,11 @@ export function Dashboard({
       if (n < moto.kmActual - 200 && !window.confirm(`El odómetro bajaría de ${num(moto.kmActual)} a ${num(n)} km. ¿Seguro?`)) return;
       guardarVehiculo({ kmActual: n });
       setMsg(`Odómetro actualizado a ${num(n)} km.`);
-    } else if (k === "nodo") {
+    } else if (k === "nodo" || k === "zona") {
       const n = Number(resto[0]);
-      const s = SUBSISTEMAS[n - 1];
-      if (!s) return setMsg("Uso: nodo 1 a 7");
-      setSubId(s.id);
+      if (!n || n < 1 || n > 6) return setMsg("Uso: zona 1 a 6");
       document.getElementById("mapa")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      setMsg(`Nodo ${n}: ${s.nombre}`);
+      setMsg(`Zona ${n} del mapa de la moto`);
     } else if (k === "cadena") {
       document.getElementById("cadena")?.scrollIntoView({ behavior: "smooth", block: "start" });
       setMsg("Asistente de cadena listo.");
@@ -578,117 +554,18 @@ export function Dashboard({
         </button>
       </div>
 
-      {/* ---------------- Mapa de subsistemas ---------------- */}
-      <div id="mapa" className="bike-map p-3.5">
+      {/* ---------------- La moto, por zonas ---------------- */}
+      <div id="mapa" className="card p-3.5">
         <div className="flex items-center justify-between">
-          <h2 className="text-[0.92rem] font-bold text-slate-100">Mapa de subsistemas</h2>
-          <span className="chip-dark">7 nodos</span>
+          <h2 className="ink text-[0.92rem] font-bold">La moto, por zonas</h2>
+          <span className="chip" style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}>
+            6 zonas
+          </span>
         </div>
-
-        <div className="relative mt-2 overflow-hidden rounded-xl">
-          <svg viewBox="15 45 375 140" className="w-full" role="img" aria-label="Esquema de la Yamaha XTZ 250">
-            <defs>
-              <linearGradient id="motoGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" />
-                <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.35" />
-              </linearGradient>
-            </defs>
-            {/* piso */}
-            <line x1="20" y1="172" x2="380" y2="172" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="4 6" />
-            {/* ruedas */}
-            <circle cx="82" cy="138" r="34" fill="none" stroke="#334155" strokeWidth="7" />
-            <circle cx="82" cy="138" r="22" fill="none" stroke="#1e293b" strokeWidth="1.5" />
-            <circle cx="318" cy="138" r="36" fill="none" stroke="#334155" strokeWidth="7" />
-            <circle cx="318" cy="138" r="24" fill="none" stroke="#1e293b" strokeWidth="1.5" />
-            {/* basculante */}
-            <line x1="82" y1="138" x2="182" y2="126" stroke="#475569" strokeWidth="5" strokeLinecap="round" />
-            {/* cadena */}
-            <path d="M82 152 L182 140" stroke="#f59e0b" strokeWidth="2.6" strokeDasharray="3 3" strokeLinecap="round" />
-            {/* chasis */}
-            <path d="M182 126 L214 96 L262 96 L286 118" fill="none" stroke="url(#motoGrad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            {/* motor */}
-            <rect x="186" y="112" width="52" height="30" rx="5" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-            <line x1="196" y1="112" x2="196" y2="142" stroke="#334155" strokeWidth="2" />
-            <line x1="208" y1="112" x2="208" y2="142" stroke="#334155" strokeWidth="2" />
-            <line x1="220" y1="112" x2="220" y2="142" stroke="#334155" strokeWidth="2" />
-            {/* tanque y silla */}
-            <path d="M212 92 L246 78 L272 82 L282 96 L252 100 Z" fill="#0b3f8f" stroke="#3b82f6" strokeWidth="1.5" opacity="0.9" />
-            <path d="M168 92 L214 92 L222 100 L176 104 Z" fill="#111827" stroke="#334155" strokeWidth="1.5" />
-            {/* horquilla y manubrio */}
-            <line x1="318" y1="138" x2="292" y2="76" stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
-            <line x1="292" y1="76" x2="268" y2="66" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-            <path d="M286 70 L306 64" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" />
-            {/* faro */}
-            <circle cx="306" cy="70" r="9" fill="#fde68a" opacity="0.9" />
-            <circle cx="306" cy="70" r="14" fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.5" />
-            {/* escape */}
-            <path d="M206 146 L150 152 L120 150" stroke="#64748b" strokeWidth="4" strokeLinecap="round" />
-            {/* defensas */}
-            <path d="M212 112 C204 100 206 92 214 86" stroke="#22d3ee" strokeWidth="2.5" fill="none" />
-            <path d="M262 112 C270 100 268 92 260 86" stroke="#22d3ee" strokeWidth="2.5" fill="none" />
-            {/* guardabarros alto */}
-            <path d="M286 92 C300 88 312 92 316 100" stroke="#38bdf8" strokeWidth="3" fill="none" />
-            {/* portaplaca */}
-            <rect x="98" y="96" width="20" height="12" rx="2" fill="#0f172a" stroke="#475569" strokeWidth="1.5" />
-          </svg>
-
-          {SUBSISTEMAS.map((s, i) => {
-            const p = POS[s.id] ?? { x: 50, y: 50 };
-            return (
-              <button
-                key={s.id}
-                className={`hotspot ${subId === s.id ? "active" : ""}`}
-                style={{ left: `${p.x}%`, top: `${p.y}%`, color: subId === s.id ? "#1a1005" : s.color }}
-                onClick={() => setSubId(s.id)}
-                aria-label={s.nombre}
-                title={s.nombre}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/60 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="text-[0.88rem] font-bold leading-snug text-white">{sub.nombre}</h3>
-              <p className="mt-0.5 text-[0.66rem] text-slate-400">
-                {sub.badge}
-                {sub.manual ? ` · ${sub.manual}` : ""}
-              </p>
-            </div>
-            <Chip tono={subEstado.tono}>{subEstado.texto}</Chip>
-          </div>
-
-          <ul className="mt-2 flex flex-col gap-1">
-            {sub.specs.slice(0, verCadena ? sub.specs.length : 3).map((s) => (
-              <li key={s} className="flex gap-1.5 text-[0.72rem] leading-relaxed text-slate-300">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-sky-400" />
-                {s}
-              </li>
-            ))}
-          </ul>
-
-          {sub.alertas.length > 0 && (
-            <div className="mt-2 flex flex-col gap-1">
-              {sub.alertas.map((a) => (
-                <p key={a} className="flex items-start gap-1.5 rounded-lg bg-amber-400/10 px-2 py-1.5 text-[0.68rem] leading-snug text-amber-200">
-                  <AlertTriangle size={11} className="mt-0.5 shrink-0" />
-                  {a}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-2 flex flex-wrap gap-1">
-            {sub.herramientas.map((h) => (
-              <span key={h} className="chip-dark">
-                {h}
-              </span>
-            ))}
-          </div>
-        </div>
+        <p className="ink-3 mb-2 mt-0.5 text-[0.68rem]">
+          Toca una zona para ver qué le vence y registrarlo.
+        </p>
+        <MotoMapa onServicio={() => onServicio()} />
       </div>
 
       {/* ---------------- Próximos servicios ---------------- */}
