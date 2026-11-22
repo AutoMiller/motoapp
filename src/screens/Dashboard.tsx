@@ -45,7 +45,6 @@ import { CAPACIDAD_TANQUE_L, CONSUMO_REF_KML, SUBSISTEMAS, TAREAS_SEED } from ".
 import { BarrasMensuales } from "../components/charts";
 import { Chip, Ring, Segmented } from "../components/ui";
 import { Icono } from "../components/iconos";
-import { Radar } from "../components/Radar";
 import { Ayuda } from "../components/Ayuda";
 
 export type Seccion =
@@ -267,6 +266,67 @@ export function Dashboard({
     setCmd("");
   }
 
+  /* ---- Urgencias: top 3 por gravedad ---- */
+  const urgencias = useMemo(() => {
+    const out: Array<{ id: string; titulo: string; detalle: string; tono: "bad" | "warn" | "info"; accion: string; onClick: () => void }> = [];
+    // Componentes vencidos/urgentes
+    for (const d of ds) {
+      if (d.estado === "vencido" || d.estado === "urgente") {
+        out.push({
+          id: `comp-${d.componente.id}`,
+          titulo: d.componente.nombre,
+          detalle: d.estado === "vencido"
+            ? `Vencido · ${d.kmExcedidos > 0 ? `${num(d.kmExcedidos)} km pasado` : "pasado de fecha"}`
+            : `Urgente · ${num(d.kmRestantes)} km restantes`,
+          tono: d.estado === "vencido" ? "bad" : "warn",
+          accion: "Registrar ahora",
+          onClick: () => onServicio(d.componente.categoria),
+        });
+      }
+    }
+    // Documentos por vencer
+    for (const d of docsVenc) {
+      if (d.diasRestantes < 30) {
+        out.push({
+          id: `doc-${d.documento.id}`,
+          titulo: d.documento.nombre,
+          detalle: d.diasRestantes < 0
+            ? `Vencido hace ${Math.abs(d.diasRestantes)} días`
+            : `Vence en ${d.diasRestantes} días`,
+          tono: d.diasRestantes < 0 ? "bad" : "warn",
+          accion: "Renovar",
+          onClick: () => onAbrir("documentos"),
+        });
+      }
+    }
+    // Tareas pendientes sin hacer
+    const pendientesSinHacer = pendientes.filter((t) => !t.hecho);
+    if (pendientesSinHacer.length > 0) {
+      out.push({
+        id: "pendientes",
+        titulo: `${pendientesSinHacer.length} pendiente${pendientesSinHacer.length > 1 ? "s" : ""}`,
+        detalle: pendientesSinHacer[0].titulo,
+        tono: pendientesSinHacer.some((t) => t.prioridad === "alta") ? "warn" : "info",
+        accion: "Ver checklist",
+        onClick: () => {
+          setVerChecklist(true);
+          document.getElementById("checklist")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        },
+      });
+    }
+    // Ordenar: bad > warn > info
+    const orden = { bad: 0, warn: 1, info: 2 };
+    return out.sort((a, b) => orden[a.tono] - orden[b.tono]).slice(0, 3);
+  }, [ds, docsVenc, pendientes, onServicio, onAbrir]);
+
+  /* ---- Salud: desglose para la línea explicativa ---- */
+  const saludDesglose = useMemo(() => {
+    const compPct = ds.length === 0 ? 100 : Math.round((ds.reduce((a, d) => a + d.restantePct, 0) / ds.length) * 100);
+    const docPct = docsVenc.length === 0 ? 100 : Math.round((docsVenc.filter((d) => d.diasRestantes >= 0).length / docsVenc.length) * 100);
+    const tareasPct = pendientes.length === 0 ? 100 : Math.round(((pendientes.length - pendientes.filter((t) => !t.hecho).length) / pendientes.length) * 100);
+    return { compPct, docPct, tareasPct };
+  }, [ds, docsVenc, pendientes]);
+
   return (
     <div className="flex flex-col gap-4 pb-32">
       {/* ---------------- Barra superior ---------------- */}
@@ -297,143 +357,239 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ---------------- Radar de problemas ---------------- */}
-      <Radar ir={(s) => onAbrir(s)} />
-
-      {/* ---------------- HUD ---------------- */}
+      {/* ============ 1. HERO CARD: odómetro + placa + Actualizar km + atajos ============ */}
       <div className="hud p-4 sm:p-5">
         <div className="hud-glow" style={{ background: "#0ea5e9", top: -120, right: -80 }} />
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
               <span className="chip-dark" style={{ background: "rgba(16,185,129,.16)", color: "#6ee7b7", borderColor: "rgba(16,185,129,.35)" }}>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> OPERATIVA
               </span>
               <span className="chip-dark">ABS OK</span>
               <span className="chip-dark">TAGS ✓</span>
             </div>
-            <h1 className="truncate text-[1.15rem] font-extrabold leading-tight text-white">
-              {v.marca} {v.linea}
-            </h1>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="nums text-[2.1rem] font-extrabold leading-none tabular-nums text-white">{num(v.kmActual)}</span>
+              <span className="text-[0.85rem] font-bold text-slate-400">km</span>
+            </div>
             <p className="nums text-[0.74rem] text-slate-400">
-              {v.placa} · {num(v.kmActual)} km · {v.ciudad}
+              {v.placa} · {v.marca} {v.linea} · {v.ciudad}
             </p>
           </div>
-          <div className="flex flex-col items-center">
-            <Ring value={salud / 100} size={58} stroke={5}>
-              <span className="nums text-[0.8rem] font-extrabold text-white">{salud}%</span>
-            </Ring>
-            <div className="mt-0.5 flex items-center gap-1">
-              <span className="text-[0.56rem] font-bold uppercase tracking-widest text-slate-500">Salud</span>
-              <Ayuda texto="Promedio de vida útil restante de todos los componentes (55%) + % documentos legales vigentes (45%)." />
+          <div className="flex flex-col items-center gap-2">
+            <button
+              className="btn btn-primary py-2 text-[0.78rem]"
+              onClick={onEditarKm}
+              aria-label="Actualizar kilometraje"
+            >
+              <Gauge size={14} /> Actualizar km
+            </button>
+            <div className="flex gap-1.5">
+              {[10, 50, 100].map((n) => (
+                <button
+                  key={n}
+                  className="rounded-lg border border-slate-600/50 bg-slate-800/50 px-2 py-1 text-[0.68rem] font-bold text-slate-300 transition hover:bg-slate-700/60"
+                  onClick={onEditarKm}
+                  title={`Sugerir +${n} km`}
+                >
+                  +{n}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="relative mt-4 grid gap-3 sm:grid-cols-[1.15fr_1fr]">
-          {/* LCD */}
-          <button
-            onClick={() => setLcd((n) => n + 1)}
-            className="lcd p-3.5 text-left"
-            aria-label="Cambiar dato del tablero"
-          >
-            <div className="flex items-center justify-between text-[0.58rem] font-bold uppercase tracking-widest opacity-70">
-              <span>XTZ 250 · HUD</span>
-              <span>{v.placa}</span>
+        {/* LCD clicable */}
+        <button
+          onClick={() => setLcd((n) => n + 1)}
+          className="relative mt-3 lcd w-full p-3 text-left"
+          aria-label="Cambiar dato del tablero"
+        >
+          <div className="flex items-center justify-between text-[0.58rem] font-bold uppercase tracking-widest opacity-70">
+            <span>XTZ 250 · HUD</span>
+            <span>{v.placa}</span>
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="lcd-seg nums text-[1.6rem] font-extrabold leading-none">{actual.valor}</span>
+            <span className="text-[0.72rem] font-bold opacity-70">{actual.unidad}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            <span className="text-[0.6rem] font-bold uppercase tracking-widest opacity-70">{actual.etiqueta}</span>
+            <span className="rounded border border-black/20 px-1.5 py-0.5 text-[0.55rem] font-bold">SELECT</span>
+          </div>
+          <div className="mt-1.5 flex gap-1">
+            {lcdItems.map((_, i) => (
+              <span
+                key={i}
+                className="h-1 flex-1 rounded-full"
+                style={{ background: i === lcd % lcdItems.length ? "#0a1a11" : "rgba(10,26,17,.22)" }}
+              />
+            ))}
+          </div>
+        </button>
+
+        {/* Combustible + Aceite + Hito */}
+        <div className="relative mt-3 grid gap-2.5 sm:grid-cols-2">
+          <div>
+            <div className="flex items-center justify-between text-[0.66rem] font-semibold text-slate-400">
+              <span className="flex items-center gap-1">
+                <Fuel size={11} /> Combustible
+              </span>
+              <span className="nums text-slate-300">{Math.round(fuelPct * 100)}%</span>
             </div>
-            <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="lcd-seg nums text-[2.05rem] font-extrabold leading-none">{actual.valor}</span>
-              <span className="text-[0.72rem] font-bold opacity-70">{actual.unidad}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-[0.6rem] font-bold uppercase tracking-widest opacity-70">{actual.etiqueta}</span>
-              <span className="rounded border border-black/20 px-1.5 py-0.5 text-[0.55rem] font-bold">SELECT</span>
-            </div>
-            <div className="mt-2 flex gap-1">
-              {lcdItems.map((_, i) => (
+            <div className="mt-1 flex gap-1">
+              {[0, 1, 2, 3, 4].map((i) => (
                 <span
                   key={i}
-                  className="h-1 flex-1 rounded-full"
-                  style={{ background: i === lcd % lcdItems.length ? "#0a1a11" : "rgba(10,26,17,.22)" }}
+                  className="h-2 flex-1 rounded-sm"
+                  style={{ background: fuelPct * 5 > i ? "#34d399" : "rgba(148,163,184,.18)" }}
                 />
               ))}
             </div>
-          </button>
+            <p className="nums mt-1 text-[0.62rem] text-slate-500">≈ {num(autonomia)} km de autonomía</p>
+          </div>
 
-          {/* Barras */}
-          <div className="flex flex-col justify-between gap-2.5">
-            <div>
-              <div className="flex items-center justify-between text-[0.66rem] font-semibold text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Fuel size={11} /> Combustible
-                </span>
-                <span className="nums text-slate-300">{Math.round(fuelPct * 100)}%</span>
-              </div>
-              <div className="mt-1 flex gap-1">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <span
-                    key={i}
-                    className="h-2 flex-1 rounded-sm"
-                    style={{ background: fuelPct * 5 > i ? "#34d399" : "rgba(148,163,184,.18)" }}
-                  />
-                ))}
-              </div>
-              <p className="nums mt-1 text-[0.62rem] text-slate-500">≈ {num(autonomia)} km de autonomía</p>
+          <div>
+            <div className="flex items-center justify-between text-[0.66rem] font-semibold text-slate-400">
+              <span className="flex items-center gap-1">
+                <Droplet size={11} /> Aceite
+              </span>
+              <span className="nums text-slate-300">
+                {num(trip2)} / 5.000 km
+              </span>
             </div>
-
-            <div>
-              <div className="flex items-center justify-between text-[0.66rem] font-semibold text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Droplet size={11} /> Aceite
-                </span>
-                <span className="nums text-slate-300">
-                  {num(trip2)} / 5.000 km
-                </span>
-              </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-700/40">
-                <div
-                  className="h-full rounded-full transition-[width] duration-700"
-                  style={{ width: `${Math.max(2, aceitePct * 100)}%`, background: aceitePct > 0.35 ? "#38bdf8" : aceitePct > 0.15 ? "#fbbf24" : "#f87171" }}
-                />
-              </div>
-              <p className="nums mt-1 text-[0.62rem] text-slate-500">
-                {aceitePct > 0.02 ? `Faltan ${num(5000 - trip2)} km para el cambio` : "Cambio de aceite vencido"}
-              </p>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-700/40">
+              <div
+                className="h-full rounded-full transition-[width] duration-700"
+                style={{ width: `${Math.max(2, aceitePct * 100)}%`, background: aceitePct > 0.35 ? "#38bdf8" : aceitePct > 0.15 ? "#fbbf24" : "#f87171" }}
+              />
             </div>
-
-            <div className="rounded-xl border border-orange-400/25 bg-orange-400/10 px-2.5 py-2">
-              <div className="flex items-center gap-1">
-                <p className="text-[0.58rem] font-bold uppercase tracking-widest text-orange-300">Próximo hito</p>
-                <Ayuda texto="Múltiplo de 5 000 km superior al kilometraje actual. Se usa como referencia para el gran servicio." />
-              </div>
-              <p className="nums text-[0.9rem] font-extrabold text-white">
-                {num(hito)} km · faltan {num(faltanHito)}
-              </p>
-            </div>
+            <p className="nums mt-1 text-[0.62rem] text-slate-500">
+              {aceitePct > 0.02 ? `Faltan ${num(5000 - trip2)} km para el cambio` : "Cambio de aceite vencido"}
+            </p>
           </div>
         </div>
 
-        <div className="relative mt-4 grid grid-cols-3 gap-2">
+        <div className="relative mt-2 rounded-xl border border-orange-400/25 bg-orange-400/10 px-2.5 py-2">
+          <div className="flex items-center gap-1">
+            <p className="text-[0.58rem] font-bold uppercase tracking-widest text-orange-300">Próximo hito</p>
+            <Ayuda texto="Múltiplo de 5 000 km superior al kilometraje actual. Se usa como referencia para el gran servicio." />
+          </div>
+          <p className="nums text-[0.9rem] font-extrabold text-white">
+            {num(hito)} km · faltan {num(faltanHito)}
+          </p>
+        </div>
+
+        <div className="relative mt-2 grid grid-cols-3 gap-2">
           <HudStat etiqueta="Registros" valor={String(state.mantenimientos.length)} />
           <HudStat etiqueta="Invertido" valor={moneyShort(state.mantenimientos.reduce((a, m) => a + m.costo, 0))} />
           <HudStat etiqueta="Puntos" valor={num(state.puntos.reduce((a, p) => a + p.puntos, 0))} onClick={onPuntos} />
         </div>
+      </div>
 
-        <div className="relative mt-3 flex gap-2">
-          <button className="btn btn-primary flex-1 py-2.5 text-[0.8rem]" onClick={() => onServicio()}>
-            <Plus size={15} /> Servicio
-          </button>
-          <button className="btn flex-1 border border-slate-600/60 bg-slate-800/60 py-2.5 text-[0.8rem] text-slate-200 hover:bg-slate-700/60" onClick={onTanqueo}>
-            <Fuel size={15} /> Tanqueo
-          </button>
-          <button
-            className="btn border border-slate-600/60 bg-slate-800/60 px-3 py-2.5 text-slate-200 hover:bg-slate-700/60"
-            onClick={onEditarKm}
-            aria-label="Editar kilometraje"
-          >
-            <Gauge size={15} />
-          </button>
+      {/* ============ 2. ÍNDICE DE SALUD 0-100 con anillo ============ */}
+      <div className="card p-4">
+        <div className="flex items-center gap-4">
+          <Ring value={salud / 100} size={64} stroke={6}>
+            <span className="nums text-[1rem] font-extrabold text-white">{salud}</span>
+          </Ring>
+          <div className="min-w-0 flex-1">
+            <h2 className="ink text-[0.92rem] font-bold">Índice de Salud</h2>
+            <p className="ink-3 nums text-[0.72rem] tabular-nums">
+              {saludDesglose.compPct}% componentes · {saludDesglose.docPct}% papeles · {saludDesglose.tareasPct}% tareas
+            </p>
+            {/*
+              // TODO: cuando lib/calc exporte indiceSalud(state, pesos), reemplazar saludVehiculo(state):
+              // import { indiceSalud } from "../lib/calc";
+              // const salud = useMemo(() => indiceSalud(state, { componentes: 0.55, papeles: 0.25, tareas: 0.20 }), [state]);
+            */}
+          </div>
         </div>
+      </div>
+
+      {/* ============ 3. BANDA DE URGENCIA: máx 3 tarjetas con acción ============ */}
+      {urgencias.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 pb-1 pt-3.5">
+            <CircleAlert size={15} style={{ color: urgencias.some((u) => u.tono === "bad") ? "var(--bad)" : "var(--warn)" }} />
+            <p className="ink text-[0.86rem] font-bold">Requiere atención</p>
+            <span className="ml-auto chip" style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}>
+              {urgencias.length}
+            </span>
+          </div>
+          {urgencias.map((u) => {
+            const c =
+              u.tono === "bad"
+                ? { fg: "var(--bad)", bg: "var(--bad-soft)", borde: "rgba(239,68,68,.28)" }
+                : u.tono === "warn"
+                  ? { fg: "var(--warn)", bg: "var(--warn-soft)", borde: "rgba(245,158,11,.28)" }
+                  : { fg: "var(--info)", bg: "var(--info-soft)", borde: "rgba(59,130,246,.25)" };
+            const Icon = u.tono === "info" ? ListChecks : Wrench;
+            return (
+              <div
+                key={u.id}
+                className="flex items-center gap-3 px-4 py-3"
+                style={{ borderTop: "1px solid var(--hairline)" }}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                  style={{ background: c.bg, color: c.fg, border: `1px solid ${c.borde}` }}>
+                  <Icon size={15} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="ink block truncate text-[0.79rem] font-semibold">{u.titulo}</span>
+                  <span className="ink-3 block text-[0.68rem]">{u.detalle}</span>
+                </span>
+                <button
+                  className="shrink-0 rounded-lg px-2.5 py-1.5 text-[0.7rem] font-bold text-white transition active:scale-95"
+                  style={{ background: c.fg }}
+                  onClick={u.onClick}
+                >
+                  {u.accion}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ============ 4. ACCESOS RÁPIDOS: 4 botones grandes 48px ============ */}
+      <div className="grid grid-cols-4 gap-2">
+        <button
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-700/60 bg-slate-800/60 py-2 text-[0.68rem] font-bold text-slate-200 transition active:scale-95"
+          style={{ minHeight: 48 }}
+          onClick={onTanqueo}
+        >
+          <Fuel size={18} style={{ color: "var(--ok)" }} />
+          Tanquear
+        </button>
+        <button
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-700/60 bg-slate-800/60 py-2 text-[0.68rem] font-bold text-slate-200 transition active:scale-95"
+          style={{ minHeight: 48 }}
+          onClick={() => onServicio()}
+        >
+          <Plus size={18} style={{ color: "var(--brand)" }} />
+          Servicio
+        </button>
+        <button
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-700/60 bg-slate-800/60 py-2 text-[0.68rem] font-bold text-slate-200 transition active:scale-95"
+          style={{ minHeight: 48 }}
+          onClick={() => onAbrir("plan")}
+        >
+          <Link2 size={18} style={{ color: "var(--warn)" }} />
+          Cadena
+        </button>
+        <button
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-700/60 bg-slate-800/60 py-2 text-[0.68rem] font-bold text-slate-200 transition active:scale-95"
+          style={{ minHeight: 48 }}
+          onClick={() => {
+            setVerChecklist(true);
+            document.getElementById("checklist")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
+          <ListChecks size={18} style={{ color: "var(--info)" }} />
+          Checklist
+        </button>
       </div>
 
       {/* ---------------- Mapa de subsistemas ---------------- */}
