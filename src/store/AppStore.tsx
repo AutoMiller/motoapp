@@ -17,12 +17,23 @@ import type {
 import { estadoInicial, estadoDemo, migrar, type DatosOnboarding } from "../data/seed";
 import { crearBackend, type Backend, type Capacidades } from "./backend";
 import { aplicarMutacion, puntosTotales } from "./mutaciones";
+import { createDebounce } from "../lib/debounce";
 
 export { PUNTOS } from "./mutaciones";
 
 interface Aviso {
   texto: string;
   tono: "ok" | "error" | "info";
+}
+
+/** Estados de sincronización expuestos al contexto. */
+export type EstadoSync = "ok" | "pendiente" | "sincronizando" | "error";
+
+interface SyncCtx {
+  estadoSync: EstadoSync;
+  pendientes: number;
+  ultimoSync: number | null;
+  reintentar: () => void;
 }
 
 interface Ctx {
@@ -32,6 +43,7 @@ interface Ctx {
   guardando: boolean;
   aviso: Aviso | null;
   errorCarga: string | null;
+  sync: SyncCtx;
   recargar: () => Promise<void>;
   limpiarAviso: () => void;
   guardarVehiculo: (patch: Partial<Vehiculo>) => void;
@@ -74,6 +86,14 @@ interface Ctx {
 const AppCtx = createContext<Ctx | null>(null);
 
 const INTERVALO_SYNC_MS = 15_000;
+const DEBOUNCE_MS = 2_000;
+
+/** Cola en memoria de mutaciones pendientes de sync con el backend. */
+interface MutacionPendiente {
+  accion: string;
+  datos: unknown;
+  estado: AppState;
+}
 
 export function AppProvider({ children, backendInicial, etiqueta }: {
   children: React.ReactNode;
@@ -92,9 +112,22 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
+  // --- Estado de sincronización ---
+  const [estadoSync, setEstadoSync] = useState<EstadoSync>("ok");
+  const [ultimoSync, setUltimoSync] = useState<number | null>(null);
+
   const stateRef = useRef(state);
   const tokenRef = useRef("");
   const guardandoRef = useRef(0);
+
+  // Cola en memoria de mutaciones pendientes
+  const colaRef = useRef<MutacionPendiente[]>([]);
+
+  // Debounce para coalescer mutaciones rápidas
+  const debounceRef = useRef(createDebounce((_val: unknown) => {
+    // Se ejecuta cuando el debounce expira: envía el estado actual al backend
+    void enviarAlBackend();
+  }, DEBOUNCE_MS));
 
   useEffect(() => {
     stateRef.current = state;
@@ -116,6 +149,7 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
         tokenRef.current = snap.token;
         setErrorCarga(null);
         setCargado(true);
+        setUltimoSync(Date.now());
       })
       .catch((e: Error) => {
         if (!vivo) return;
@@ -127,57 +161,106 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
     };
   }, [backend, mostrarAviso]);
 
-  /* ---------------- Persistencia ---------------- */
-  const persistir = useCallback(
-    async (nuevo: AppState, accion: string, datos: unknown) => {
-      guardandoRef.current += 1;
-      setGuardando(guardandoRef.current);
-      try {
-        let r = await backend.guardar(nuevo, tokenRef.current);
-        if (!r.ok && r.estado) {
-          // La hoja cambió mientras editabas: se recarga y se reaplica el cambio.
-          const reintento = aplicarMutacion(migrar(r.estado), accion, datos);
-          const r2 = await backend.guardar(reintento, r.token);
-          if (r2.ok) {
-            setState(reintento);
-            tokenRef.current = r2.token;
-            mostrarAviso("La hoja había cambiado: se recargó y se guardó tu cambio.", "ok");
-          } else {
-            setState(migrar(r.estado));
-            tokenRef.current = r.token;
-            mostrarAviso("No se pudo guardar porque la hoja cambió. Inténtalo otra vez.", "error");
-          }
-          return;
+  /* ---------------- Persistencia optimista ---------------- */
+
+  /**
+   * Envía el estado actual al backend.  Si falla, el cambio local se conserva
+   * y el estado pasa a 'error' para que el usuario pueda reintentar.
+   */
+  const enviarAlBackend = useCallback(async () => {
+    const actual = stateRef.current;
+    const token = tokenRef.current;
+
+    // Si no hay cambios pendientes, no hacer nada
+    if (colaRef.current.length === 0) return;
+
+    setGuardando(1);
+    setEstadoSync("sincronizando");
+
+    try {
+      let r = await backend.guardar(actual, token);
+
+      // La hoja cambió: recargar y reaplicar la última mutación pendiente
+      if (!r.ok && r.estado) {
+        const pendientes = colaRef.current;
+        colaRef.current = [];
+
+        // Recargar estado remoto y reaplicar todas las mutaciones pendientes
+        let reintento = migrar(r.estado);
+        for (const m of pendientes) {
+          reintento = aplicarMutacion(reintento, m.accion, m.datos);
         }
-        if (r.ok) tokenRef.current = r.token;
-        else mostrarAviso("No se pudo guardar el cambio.", "error");
-      } catch (e) {
-        const msg = (e as Error).message;
-        // Errores de almacenamiento lleno: aviso persistente (no se auto-cierra)
-        if ((e as Error).name === "StorageFullError") {
-          setAviso({ texto: msg, tono: "error" });
+
+        const r2 = await backend.guardar(reintento, r.token);
+        if (r2.ok) {
+          setState(reintento);
+          stateRef.current = reintento;
+          tokenRef.current = r2.token;
+          setEstadoSync("ok");
+          setUltimoSync(Date.now());
+          mostrarAviso("La hoja había cambiado: se recargó y se guardó tu cambio.", "ok");
         } else {
-          mostrarAviso(`Error al guardar: ${msg}`, "error");
+          // Error al reintentar: conservar cambios locales
+          setState(migrar(r.estado));
+          stateRef.current = migrar(r.estado);
+          tokenRef.current = r.token;
+          setEstadoSync("error");
+          mostrarAviso("No se pudo guardar porque la hoja cambió. Inténtalo otra vez.", "error");
         }
-      } finally {
-        guardandoRef.current = Math.max(0, guardandoRef.current - 1);
-        setGuardando(guardandoRef.current);
+        setGuardando(0);
+        return;
       }
-    },
-    [backend, mostrarAviso],
-  );
+
+      if (r.ok) {
+        tokenRef.current = r.token;
+        colaRef.current = [];
+        setEstadoSync("ok");
+        setUltimoSync(Date.now());
+      } else {
+        // Backend rechazó pero no por conflicto: error
+        setEstadoSync("error");
+        mostrarAviso("No se pudo guardar el cambio.", "error");
+      }
+    } catch (e) {
+      const msg = (e as Error).message;
+      if ((e as Error).name === "StorageFullError") {
+        setAviso({ texto: msg, tono: "error" });
+      } else {
+        mostrarAviso(`Error al guardar: ${msg}`, "error");
+      }
+      // Conservar cambios locales — cola se mantiene para reintento
+      setEstadoSync("error");
+    } finally {
+      setGuardando(0);
+    }
+  }, [backend, mostrarAviso]);
 
   const mutar = useCallback(
     (accion: string, datos?: unknown) => {
       const base = stateRef.current;
       const nuevo = aplicarMutacion(base, accion, datos);
       if (nuevo === base) return;
+
+      // 1. Aplicar inmediatamente al estado local (optimistic UI)
       stateRef.current = nuevo;
       setState(nuevo);
-      void persistir(nuevo, accion, datos);
+
+      // 2. Registrar en la cola de pendientes
+      colaRef.current.push({ accion, datos, estado: nuevo });
+
+      // 3. Actualizar estado de sync
+      setEstadoSync((prev) => (prev === "error" ? "pendiente" : "pendiente"));
+
+      // 4. Programar envío al backend con debounce (coalescing)
+      debounceRef.current.schedule(nuevo);
     },
-    [persistir],
+    [],
   );
+
+  /** Reintento manual: envía inmediatamente sin esperar al debounce. */
+  const reintentar = useCallback(() => {
+    debounceRef.current.flush();
+  }, []);
 
   /* ---------------- Modo solo lectura (datos traídos por el enlace) ---------------- */
   const soloLectura = backend.capacidades.soloLectura === true;
@@ -191,6 +274,17 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
     },
     [soloLectura, mutar, mostrarAviso],
   );
+
+  /* ---------------- Reintento automático al volver online ---------------- */
+  useEffect(() => {
+    const onOnline = () => {
+      if (estadoSync === "error" || colaRef.current.length > 0) {
+        void enviarAlBackend();
+      }
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [enviarAlBackend, estadoSync]);
 
   /* ---------------- Sincronización con la hoja ---------------- */
   useEffect(() => {
@@ -206,7 +300,9 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
         if (!vivo) return;
         if (snap.token !== tokenRef.current) {
           setState(migrar(snap.estado));
+          stateRef.current = migrar(snap.estado);
           tokenRef.current = snap.token;
+          setUltimoSync(Date.now());
           mostrarAviso("Actualizado desde la hoja de cálculo.", "ok");
         }
       } catch {
@@ -232,6 +328,13 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
     };
   }, [cargado, backend, mostrarAviso]);
 
+  /* ---------------- Limpieza al desmontar ---------------- */
+  useEffect(() => {
+    return () => {
+      debounceRef.current.cancel();
+    };
+  }, []);
+
   /* ---------------- Tema ---------------- */
   useEffect(() => {
     const raiz = document.documentElement;
@@ -256,12 +359,21 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
       guardando: guardando > 0,
       aviso,
       errorCarga,
+      sync: {
+        estadoSync,
+        pendientes: colaRef.current.length,
+        ultimoSync,
+        reintentar,
+      },
       recargar: async () => {
         try {
           const snap = await backend.cargar();
           setState(migrar(snap.estado));
+          stateRef.current = migrar(snap.estado);
           tokenRef.current = snap.token;
           setErrorCarga(null);
+          setUltimoSync(Date.now());
+          setEstadoSync("ok");
           mostrarAviso("Datos actualizados.", "ok");
         } catch (e) {
           setErrorCarga((e as Error).message);
@@ -309,7 +421,8 @@ export function AppProvider({ children, backendInicial, etiqueta }: {
       exportar: () => JSON.stringify(state, null, 2),
       totalPuntos: puntosTotales(state),
     }),
-    [state, cargado, backend, guardando, aviso, errorCarga, mutarSeguro, mostrarAviso],
+    [state, cargado, backend, guardando, aviso, errorCarga, mutarSeguro, mostrarAviso,
+     estadoSync, ultimoSync, reintentar],
   );
 
   return <AppCtx.Provider value={valor}>{children}</AppCtx.Provider>;
