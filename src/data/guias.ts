@@ -18,7 +18,11 @@ export const GUIAS: Guia[] = [
         items: [
           "Solo piloto: 18 psi delantera · 22 psi trasera",
           "Con pasajero o carga: 22 psi delantera · 29 psi trasera",
-          "Trocha o arena: bajar 2-3 psi para ganar tracción (sin pasar de 15/19)",
+          "Off-road — tabla de presiones por terreno (criterio propio del dueño, NO está en el manual del propietario):", // auditoría #19
+          "  • Arena/lodo:    14–16 psi delantera · 14–16 psi trasera", // auditoría #19
+          "  • Trocha:        16–20 psi delantera · 16–20 psi trasera", // auditoría #19
+          "  • Ripio:         20–23 psi delantera · 23–26 psi trasera", // auditoría #19
+          "  Nota: el manual B9L-F8199-S0 solo especifica presiones de asfalto (pág. 70); esta tabla es criterio propio del dueño.", // auditoría #19 nota sin fuente
         ],
       },
       {
@@ -109,7 +113,7 @@ export const GUIAS: Guia[] = [
         items: [
           "SOAT vigente (la app te avisa 30 días antes)",
           "Tecnomecánica: motos nuevas a los 2 años, luego cada año",
-          "Impuesto vehicular: depende del departamento (Meta)",
+          "Impuesto vehicular: depende del departamento (Cundinamarca)", // auditoría #48 Cundinamarca, no Meta
         ],
       },
       {
