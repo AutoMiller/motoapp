@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Check, ChevronDown, ChevronUp, AlertTriangle, Zap } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { SINTOMAS, type SintomaElectrico } from "../data/sintomas";
 import { CAJAS } from "../data/fusibles";
 
@@ -69,15 +69,6 @@ function ComoProbarFusible() {
           </li>
         ))}
       </ol>
-      <div
-        className="mt-4 flex items-start gap-2 rounded-xl border border-[var(--bad)]/20 p-3"
-        style={{ background: "var(--bad-soft)" }}
-      >
-        <AlertTriangle size={16} className="shrink-0 mt-0.5" style={{ color: "var(--bad)" }} />
-        <p className="text-[0.78rem] leading-relaxed" style={{ color: "var(--bad)" }}>
-          <strong>Nunca subas el amperaje.</strong> Poner un fusible de mayor amperaje puede derretir cables y causar un incendio. Usa siempre el amperaje especificado en el manual.
-        </p>
-      </div>
     </div>
   );
 }
