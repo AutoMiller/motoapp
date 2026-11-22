@@ -29,15 +29,22 @@ export interface Desgaste {
 export function desgasteDe(c: Componente, kmActual: number, hoy = isoDate()): Desgaste {
   const kmRecorridos = Math.max(0, kmActual - c.ultimoKm);
   const pctKm = c.intervaloKm > 0 ? clamp(1 - kmRecorridos / c.intervaloKm, 0, 1) : 1;
+
+  // Sin fecha del último servicio no se puede medir por tiempo: se usa solo el
+  // kilometraje. Antes, una fecha ausente producía NaN y el componente quedaba
+  // invisible para las alertas (nunca "vencido") — silencio, no ausencia de riesgo.
+  const fechaValida = !!c.ultimaFecha && !Number.isNaN(Date.parse(c.ultimaFecha));
   const diasIntervalo = c.intervaloMeses * DIAS_MES;
-  const diasTranscurridos = Math.max(0, -daysUntil(c.ultimaFecha, hoy));
-  const pctTiempo = diasIntervalo > 0 ? clamp(1 - diasTranscurridos / diasIntervalo, 0, 1) : 1;
+  const diasTranscurridos = fechaValida ? Math.max(0, -daysUntil(c.ultimaFecha, hoy)) : 0;
+  const pctTiempo = fechaValida && diasIntervalo > 0
+    ? clamp(1 - diasTranscurridos / diasIntervalo, 0, 1)
+    : 1;
   const restantePct = Math.min(pctKm, pctTiempo);
   const proximoKm = c.ultimoKm + c.intervaloKm;
-  const proximoVencimiento = addMonths(c.ultimaFecha, c.intervaloMeses);
+  const proximoVencimiento = fechaValida ? addMonths(c.ultimaFecha, c.intervaloMeses) : "";
   const kmFaltan = proximoKm - kmActual;
   const kmRestantes = Math.max(0, kmFaltan);
-  const diasRestantes = daysUntil(proximoVencimiento, hoy);
+  const diasRestantes = fechaValida ? daysUntil(proximoVencimiento, hoy) : 9999;
   return {
     componente: c,
     restantePct,
