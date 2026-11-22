@@ -184,11 +184,11 @@ export function estadoDemo(): AppState {
   const vehiculo: Vehiculo = {
     id: vehiculoId,
     ...MOTO_REAL,
-    vin: "",
-    numeroMotor: "",
-    fechaCompra: "2023-03-20",
+    vin: "9FKDG2848S2039378", // auditoría #44
+    numeroMotor: "G3F2E039378", // auditoría #44
+    fechaCompra: "2024-07-29", // auditoría #2
     archivado: false,
-    creado: "2023-03-15",
+    creado: "2024-07-29",
   };
 
   // Componentes: el último servicio conocido es el de 5.000 km (17 dic 2024).
@@ -222,16 +222,37 @@ export function estadoDemo(): AppState {
       tipo: "licencia_transito",
       nombre: "Licencia de tránsito",
       numero: MOTO_REAL.placa,
-      entidad: "Secretaría de Movilidad de Bogotá",
+      entidad: "Sede de Tránsito Soacha (Cundinamarca)", // auditoría #3
+    },
+    {
+      id: "doc-soat",
+      vehiculoId,
+      tipo: "soat",
+      nombre: "SOAT",
+      numero: "97401411",
+      entidad: "Seguros Mundial",
+      fechaVencimiento: "2027-06-29",
+      fechaExpedicion: "2026-06-29",
+      valor: 829400, // auditoría #45
+    },
+    {
+      id: "doc-rtm",
+      vehiculoId,
+      tipo: "tecnomecanica",
+      nombre: "Tecnomecánica",
+      numero: "191312650",
+      entidad: "CDA JMONTOYA",
+      fechaVencimiento: "2027-08-01",
+      fechaExpedicion: "2026-08-01", // auditoría #46
     },
     {
       id: "doc-seguro",
       vehiculoId,
       tipo: "seguro",
-      nombre: "Seguro todo riesgo",
-      numero: "PÓLIZA-000000",
-      entidad: "Aseguradora",
-      notas: "Ejemplo de póliza cancelada · ajusta número y vigencia",
+      nombre: "Seguro RC terceros",
+      numero: "901010849",
+      entidad: "Seguros Mundial",
+      notas: "Todo riesgo cancelado 2026-07-31. RC ter-cero vigente (~68.000/año).", // auditoría #47
     },
     {
       id: "doc-condu",
@@ -239,6 +260,7 @@ export function estadoDemo(): AppState {
       tipo: "licencia_conduccion",
       nombre: "Licencia de conducción",
       numero: "A2",
+      fechaVencimiento: "2032-04-23", // auditoría #49
     },
   ];
 

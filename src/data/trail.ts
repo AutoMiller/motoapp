@@ -5,17 +5,17 @@ import type { CategoriaMantenimiento, Tarea } from "../types";
 /* ------------------------------------------------------------------ */
 
 export const MOTO_REAL = {
-  placa: "ABC12D",
+  placa: "PLACA_DEMO", // auditoría #4
   apodo: "La XTZ",
   marca: "Yamaha",
   linea: "XTZ 250 ABS",
-  modelo: 2023,
+  modelo: 2025, // auditoría #1
   color: "Azul Yamaha",
   cilindraje: 249,
   kmActual: 9420,
   kmInicial: 5000,
-  fechaMatricula: "2023-03-15",
-  ciudad: "Bogotá",
+  fechaMatricula: "2024-07-31", // auditoría #3
+  ciudad: "Soacha",
   notas:
     "Uso mixto: ciudad, carretera y off-road (Trail.Hacker). Aceite semisintético 10W-40 cada 5.000 km controlado con TRIP 2.",
 };
@@ -54,7 +54,7 @@ export const SUBSISTEMAS: Subsistema[] = [
       "Holgura y alineación según la pág. 69 del manual de taller.",
       "Limpiar el piñón de salida (retirar la tapa con copas): acumula barro y desgasta el kit.",
       "Lubricar siempre la cara interna de la cadena y esperar 20–30 min antes de rodar.",
-      "Piñón 13 / catalina 40 · cadena 428 × 130.",
+      "Piñón 13 / catalina 40 · paso 520 (13/40) — confirmar con el repuesto.", // auditoría #30
     ],
     alertas: [
       "Reemplazar la guía de cadena (pendiente).",
@@ -79,7 +79,7 @@ export const SUBSISTEMAS: Subsistema[] = [
       "Filtro de aire lateral: revisión y limpieza en cada servicio.",
     ],
     alertas: ["Mantenimiento de los 10.000 km pendiente (manual pág. 52)."],
-    herramientas: ["Copa filtro", "Embudo", "Llave de bujía", "Torquímetro"],
+    herramientas: ["Copa filtro", "Embudo", "Llave de bujía", "Torquímetro", "Torque drenaje 20 N·m", "Torque cubierta filtro 10 N·m"], // auditoría #20
     categorias: ["aceite", "filtro_aceite", "filtro_aire", "bujia", "valvulas"],
   },
   {
@@ -190,7 +190,7 @@ export const TAREAS_SEED: Tarea[] = [
   // Checklist mantenimiento 10.000 km (manual pág. 52)
   t("checklist10k", "Cambiar aceite 10W-40 y filtro de aceite", 1),
   t("checklist10k", "Limpiar o cambiar filtro de aire", 2),
-  t("checklist10k", "Cambiar bujía NGK DR8EA", 3),
+  t("checklist10k", "Cambiar bujía NGK DR8EA-N", 3), // auditoría #14
   t("checklist10k", "Calibrar válvulas (motor frío)", 4),
   t("checklist10k", "Revisar holgura y lubricar cadena (pág. 69)", 5),
   t("checklist10k", "Revisar kit de arrastre: piñón, catalina y guía", 6),

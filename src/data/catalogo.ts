@@ -66,7 +66,7 @@ export interface DefComponente {
 }
 
 /**
- * Plan basado en el manual del propietario XTZ250 ABS (B8L-F8199-S0) y en la
+ * Plan basado en el manual del propietario XTZ250 ABS (B9L-F8199-S0) y en la // auditoría #50
  * práctica de talleres de Bogotá. Los km son la referencia oficial; en uso
  * urbano exigente conviene acortarlos (ver notas).
  */
@@ -78,7 +78,7 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 6,
     vidaUtilKm: 5000,
     costoEstimado: 85000,
-    notas: "10W-40 semisintético JASO MA/MA2 (1,45 L con filtro). Oficial: 5.000 km o 6 meses. En Bogotá se puede acortar a 4.000 km.",
+    notas: "10W-40 semisintético JASO MA/MA2 (1,45 L con filtro). Oficial: 5.000 km o 6 meses. En Bogotá se puede acortar a 4.000 km. Torque tapón drenaje 20 N·m, cubierta filtro 10 N·m (manual pág. 65).", // auditoría #20
   },
   {
     categoria: "filtro_aceite",
@@ -87,16 +87,16 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 12,
     vidaUtilKm: 10000,
     costoEstimado: 25000,
-    notas: "Cartucho 38B-E3440-00-00. Se cambia a los 10.000 km, no en cada cambio de aceite.",
+    notas: "Cartucho 1S7E34400000. Se cambia a los 10.000 km, no en cada cambio de aceite.", // auditoría #11
   },
   {
     categoria: "filtro_aire",
     nombre: "Filtro de aire",
-    intervaloKm: 10000,
+    intervaloKm: 40000, // auditoría #12
     intervaloMeses: 12,
-    vidaUtilKm: 10000,
+    vidaUtilKm: 40000, // auditoría #12
     costoEstimado: 25000,
-    notas: "Limpiar cada 5.000 km (2.500–3.000 en polvo) y cambiar a los 10.000 km.",
+    notas: "Limpiar cada servicio; cambiar a los 40.000 km (manual pág. 53).", // auditoría #12
   },
   {
     categoria: "bujia",
@@ -105,7 +105,7 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 24,
     vidaUtilKm: 10000,
     costoEstimado: 20000,
-    notas: "NGK DR8EA, gap 0,6–0,7 mm. Revisar en cada servicio.",
+    notas: "NGK DR8EA-N, gap 0,6–0,7 mm. Revisar en cada servicio.", // auditoría #14
   },
   {
     categoria: "valvulas",
@@ -123,7 +123,7 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 48,
     vidaUtilKm: 22000,
     costoEstimado: 250000,
-    notas: "Piñón 13 / catalina 40. Cambiar el kit completo; una cadena estirada desgasta la caja.",
+    notas: "Piñón 13 / catalina 40. Cambiar el kit completo; una cadena estirada desgasta la caja. Carga máxima 157 kg total, 7 kg baúl (manual pág. 97/16).", // auditoría #24
   },
   {
     categoria: "cadena",
@@ -150,7 +150,7 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 24,
     vidaUtilKm: 18000,
     costoEstimado: 60000,
-    notas: "Disco de 203 mm.",
+    notas: "Disco de 203 mm. Límite de desgaste: 1,0 mm de espesor mínimo (manual pág. 73).", // auditoría #27
   },
   {
     categoria: "frenos",
@@ -195,7 +195,7 @@ export const PLAN_XTZ250: DefComponente[] = [
     intervaloMeses: 48,
     vidaUtilKm: 20000,
     costoEstimado: 200000,
-    notas: "541 cc por barra. Revisar fugas en cada servicio.",
+    notas: "541 cc por barra. Revisar fugas en cada servicio. Torques: tuerca eje 46 N·m, contratuerca tensor 15 N·m (manual pág. 76).", // auditoría #21
   },
   {
     categoria: "bateria",
